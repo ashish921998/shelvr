@@ -30,6 +30,7 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
   public let lat, lng: Double
   public let appleId, city, category, cuisine: String?
   public let kinds: [PlaceKind]
+  public internal(set) var todayHours: PlaceDayHours? = nil
 
   public var id: String {
     switch source {
@@ -55,10 +56,12 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
     let lat, lng: Double
     let appleId, city, category, cuisine: String?
     let kinds: [String]
+    let todayHours: PlaceDayHours.Reported?
 
     var place: MapPlace {
       MapPlace(source: .saved(itemID: itemId), name: name, lat: lat, lng: lng, appleId: appleId,
-        city: city, category: category, cuisine: cuisine, kinds: kinds.compactMap(PlaceKind.init(rawValue:)))
+        city: city, category: category, cuisine: cuisine, kinds: kinds.compactMap(PlaceKind.init(rawValue:)),
+        todayHours: todayHours?.value)
     }
   }
 
@@ -68,10 +71,12 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
     let category, cuisine: String?
     let kinds: [String]
     let features: [String]?
+    let todayHours: PlaceDayHours.Reported?
 
     var place: MapPlace {
       MapPlace(source: .discover(placeID: _id, features: features ?? []), name: name, lat: lat, lng: lng,
-        appleId: appleId, city: city, category: category, cuisine: cuisine, kinds: kinds.compactMap(PlaceKind.init(rawValue:)))
+        appleId: appleId, city: city, category: category, cuisine: cuisine, kinds: kinds.compactMap(PlaceKind.init(rawValue:)),
+        todayHours: todayHours?.value)
     }
   }
 

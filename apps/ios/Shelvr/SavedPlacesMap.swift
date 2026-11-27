@@ -22,10 +22,8 @@ struct SavedPlacesMap: View {
   @State private var discoverRequest = AreaRequest(area: .world)
   @State private var filters = MapFilters()
   @State private var location = MapLocation()
-  @State private var selected: MapPlace?
   @State private var selectedLabelID: String?
-  @State private var card: MKMapItem?
-  @State private var cluster: [MapPlace] = []
+  @State private var pinSheet: PinSheet?
   @State private var errors = Set<String>()
   @State private var retry = 0
   @State private var viewport: MapViewport?
@@ -37,6 +35,17 @@ struct SavedPlacesMap: View {
   @State private var resultsOpen = true
   @State private var reportedOpen = false
   @FocusState private var focusedSearch: Bool
+
+  private enum PinSheet: Identifiable {
+    case cluster([MapPlace]), place(MapPlace)
+
+    var id: String {
+      switch self {
+      case .cluster: "cluster"
+      case .place(let place): place.id
+      }
+    }
+  }
 
   var body: some View {
     let request = discoverRequest
@@ -53,7 +62,7 @@ struct SavedPlacesMap: View {
       visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, topControlsHeight: topControlsHeight,
       bottomControlsHeight: focusedSearch ? 0 : bottomControlsHeight, locateFrame: searching ? nil : locateFrame,
       onArea: { updateDiscoverArea($0); viewport = $1 },
-      onUserMove: cancelCameraRequests, onPick: selectPlace, onCluster: { cluster = $0 })
+      onUserMove: cancelCameraRequests, onPick: selectPlace, onCluster: { pinSheet = .cluster($0) })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
         Group {
@@ -97,11 +106,16 @@ struct SavedPlacesMap: View {
       .alert(copy("common.unavailable"), isPresented: $location.unavailable) {
         Button(copy("common.close")) {}
       }
-      .mapItemDetailSheet(item: $card, displaysMap: false)
-      .sheet(isPresented: Binding(get: { !cluster.isEmpty }, set: { if !$0 { cluster = [] } })) {
-        List(cluster) { place in
-          Button(place.name) { cluster = []; selectPlace(place) }
-        }.presentationDetents([.medium, .large])
+      .sheet(item: $pinSheet) { destination in
+        switch destination {
+        case .cluster(let places):
+          List(places) { place in Button(place.name) { selectPlace(place) } }
+            .presentationDetents([.medium, .large])
+        case .place(let place):
+          let places = place.isSaved ? personalPlaces : discover
+          let hours = places.first { $0.id == place.id }?.todayHours
+          MapPlaceSheet(place: place, todayHours: hours)
+        }
       }
       .task(id: retry) {
         await subscribe("saved") {
@@ -128,35 +142,14 @@ struct SavedPlacesMap: View {
         }
       }
       .task(id: search) { await searchCatalog(search) }
-      .task(id: selected) {
-        guard let place = selected else { return }
-        guard let owner = backend.userID else { return }
-        let session = backend.sessionGeneration
-        if let raw = place.appleId, let identifier = MKMapItem.Identifier(rawValue: raw),
-          let item = try? await MKMapItemRequest(mapItemIdentifier: identifier).mapItem {
-          guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
-          Analytics.capture("map_place_opened", ["card": true, "source": place.isSaved ? "own" : "discover"])
-          card = item
-        } else {
-          guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
-          if case let .saved(id) = place.source {
-            Analytics.capture("map_place_opened", ["card": false, "source": "own"])
-            open("/item/" + id)
-          } else {
-            let item = MKMapItem(placemark: MKPlacemark(coordinate: place.coordinate))
-            item.name = place.name
-            Analytics.capture("map_place_opened", ["source": "discover", "card": true])
-            card = item
-          }
-        }
-        selected = nil
-      }
   }
 
   private func selectPlace(_ place: MapPlace) {
+    guard backend.userID != nil else { return }
     cancelCameraRequests()
     selectedLabelID = place.id
-    selected = place
+    Analytics.capture("map_place_opened", ["card": true, "source": place.isSaved ? "own" : "discover"])
+    pinSheet = .place(place)
   }
 
   private func mapHeader(personalPlaces: [MapPlace], overviewPlaces: [MapPlace],
