@@ -10,7 +10,7 @@ const mock = vi.hoisted(() => ({
   onboarded: true,
   user: { _id: "user-1" } as { _id: string } | null,
   createDemoItem: vi.fn(),
-  queueDemoUrl: vi.fn(),
+  handOverFirstSave: vi.fn(),
   recordShareSaved: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
@@ -42,8 +42,8 @@ vi.mock("@/lib/onboarding-demo", () => ({
       ? { pageHeading: "Ready-made heading" }
       : undefined,
 }));
-vi.mock("@/lib/pending-onboarding", () => ({
-  queueDemoUrl: mock.queueDemoUrl,
+vi.mock("@/lib/onboarding-handoff", () => ({
+  handOverFirstSave: mock.handOverFirstSave,
 }));
 vi.mock("@/lib/first-share", () => ({
   recordShareSaved: mock.recordShareSaved,
@@ -97,7 +97,7 @@ beforeEach(() => {
   mock.onboarded = true;
   mock.user = { _id: "user-1" };
   mock.createDemoItem.mockReset().mockResolvedValue(result());
-  mock.queueDemoUrl.mockReset();
+  mock.handOverFirstSave.mockReset();
   mock.recordShareSaved.mockReset();
   mock.capture.mockReset();
   mock.captureError.mockReset();
@@ -114,7 +114,7 @@ describe("a first save queued before sign-in", () => {
       analyticsSessionId: "session",
     });
     expect(getQueuedFirstSaveUrl()).toBeNull();
-    expect(mock.queueDemoUrl).not.toHaveBeenCalled();
+    expect(mock.handOverFirstSave).not.toHaveBeenCalled();
     expect(mock.capture).toHaveBeenCalledWith("onboarding_demo_submitted");
   });
 
@@ -139,8 +139,28 @@ describe("a first save queued before sign-in", () => {
     );
     queueFirstSave({ url: SAMPLE, destination: "Recipes", source: "direct" });
     await mount();
-    expect(mock.queueDemoUrl).toHaveBeenCalledWith(SAMPLE, "Recipes", "user-1");
+    expect(mock.handOverFirstSave).toHaveBeenCalledWith(
+      SAMPLE,
+      "Recipes",
+      "user-1",
+    );
     expect(getQueuedFirstSaveUrl()).toBeNull();
+  });
+
+  it("reports a handover the keychain refused and keeps the link queued", async () => {
+    mock.createDemoItem.mockResolvedValue(
+      result({ reused: true, urlMatchesRequest: false, url: "https://old" }),
+    );
+    mock.handOverFirstSave.mockImplementation(() => {
+      throw new Error("keychain unavailable");
+    });
+    queueFirstSave({ url: SAMPLE, destination: "Recipes", source: "direct" });
+    await mount();
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "onboarding_first_save_handover_failed",
+      expect.any(Error),
+    );
+    expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
   });
 
   it("records a shared link as the account's first share", async () => {
@@ -153,14 +173,14 @@ describe("a first save queued before sign-in", () => {
     mock.createDemoItem.mockRejectedValue(new ConvexError({ code: "demo" }));
     queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
     await mount();
-    expect(mock.queueDemoUrl).toHaveBeenCalledWith(SAMPLE, null, "user-1");
+    expect(mock.handOverFirstSave).toHaveBeenCalledWith(SAMPLE, null, "user-1");
     expect(getQueuedFirstSaveUrl()).toBeNull();
 
     mock.createDemoItem.mockRejectedValue(new Error("offline"));
-    mock.queueDemoUrl.mockReset();
+    mock.handOverFirstSave.mockReset();
     queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
     await mount();
-    expect(mock.queueDemoUrl).not.toHaveBeenCalled();
+    expect(mock.handOverFirstSave).not.toHaveBeenCalled();
     expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
   });
 
@@ -174,7 +194,7 @@ describe("a first save queued before sign-in", () => {
     mock.user = { _id: "user-2" };
     await mount();
     expect(mock.createDemoItem).not.toHaveBeenCalled();
-    expect(mock.queueDemoUrl).not.toHaveBeenCalled();
+    expect(mock.handOverFirstSave).not.toHaveBeenCalled();
     expect(getQueuedFirstSaveUrl()).toBeNull();
   });
 
@@ -219,7 +239,7 @@ describe("a first save queued before sign-in", () => {
     );
     queueFirstSave({ url: SAMPLE, destination: null, source: "direct" });
     await mount();
-    expect(mock.queueDemoUrl).not.toHaveBeenCalled();
+    expect(mock.handOverFirstSave).not.toHaveBeenCalled();
     expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
   });
 

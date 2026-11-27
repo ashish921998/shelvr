@@ -31,12 +31,7 @@ import {
   type ProgressCommand,
   type ProgressEvent,
 } from "@/lib/onboarding-progress";
-import {
-  clearPending,
-  queueDemoUrl,
-  resolveOnboardingSpaceName,
-  setPendingSpaces,
-} from "@/lib/pending-onboarding";
+import { clearHandoff, finishHandoff } from "@/lib/onboarding-handoff";
 import { queueCityStamps } from "@/lib/pending-city-stamps";
 import { holdIncomingShare } from "@/lib/onboarding-exit";
 import { SignInView } from "@/components/sign-in-view";
@@ -146,7 +141,7 @@ export default function OnboardingScreen() {
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
     holdIncomingShare();
-    bestEffort("onboarding_sign_in_finish_failed", clearPending);
+    clearHandoff();
     clearOnboardingProgress();
     bestEffort("onboarding_sign_in_finish_failed", completeOnboarding);
   }, [signedIn, isAuthenticated, completeOnboarding]);
@@ -161,14 +156,13 @@ export default function OnboardingScreen() {
     );
     record({ type: "finish" });
     holdIncomingShare();
-    setPendingSpaces(spaces.map(resolveOnboardingSpaceName), finished);
-    // The reel they shared in the demo becomes their first real save once they can save.
-    if (!finished.skippedShare) {
-      queueDemoUrl(
-        ahaSample(planKindFor(finished.goals), finished.travelCity)
-          .firstSaveUrl,
-      );
-    }
+    finishHandoff(
+      finished,
+      finished.skippedShare
+        ? null
+        : ahaSample(planKindFor(finished.goals), finished.travelCity)
+            .firstSaveUrl,
+    );
     queueCityStamps(finished.beenCities);
     noteOnboardingFinished();
     clearOnboardingProgress();

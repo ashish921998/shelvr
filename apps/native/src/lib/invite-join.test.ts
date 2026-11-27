@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   captureError: vi.fn(),
   completeOnboarding: vi.fn(),
   holdIncomingShare: vi.fn(),
-  clearPending: vi.fn(),
+  clearHandoff: vi.fn(),
   clearOnboardingProgress: vi.fn(),
   clearPendingInvite: vi.fn(),
   router: { replace: vi.fn() },
@@ -43,8 +43,8 @@ vi.mock("@/lib/onboarding-exit", () => ({
 vi.mock("@/lib/onboarding-progress", () => ({
   clearOnboardingProgress: mocks.clearOnboardingProgress,
 }));
-vi.mock("@/lib/pending-onboarding", () => ({
-  clearPending: mocks.clearPending,
+vi.mock("@/lib/onboarding-handoff", () => ({
+  clearHandoff: mocks.clearHandoff,
 }));
 vi.mock("@/lib/pending-invite", () => ({
   clearPendingInvite: mocks.clearPendingInvite,
@@ -110,7 +110,7 @@ describe("useInviteJoinCoordinator", () => {
   it("opens the comparison without touching onboarding for an onboarded person", async () => {
     await resumeWith(true, true);
     expect(mocks.completeOnboarding).not.toHaveBeenCalled();
-    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.clearHandoff).not.toHaveBeenCalled();
     expect(mocks.router.replace).toHaveBeenCalledWith(
       "/passport-invite/tok1?compare=1",
     );
@@ -119,7 +119,7 @@ describe("useInviteJoinCoordinator", () => {
   it("keeps onboarding when the passport link died during sign-in", async () => {
     await resumeWith(false, false);
     expect(mocks.completeOnboarding).not.toHaveBeenCalled();
-    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.clearHandoff).not.toHaveBeenCalled();
     expect(mocks.clearPendingInvite).toHaveBeenCalled();
     expect(mocks.router.replace).toHaveBeenCalledWith("/passport-invite/tok1");
   });
@@ -154,7 +154,7 @@ describe("useInviteJoinCoordinator", () => {
 
   it("keeps a queued reel when an onboarded person joins from the paywall", async () => {
     await joinWith(true, "list1");
-    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.clearHandoff).not.toHaveBeenCalled();
     expect(mocks.router.replace).toHaveBeenCalledWith(
       "/shared-list/list1?joined=1",
     );
@@ -162,29 +162,26 @@ describe("useInviteJoinCoordinator", () => {
 
   it("keeps onboarding's answers when the invite is dead", async () => {
     await joinWith(false, null);
-    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.clearHandoff).not.toHaveBeenCalled();
     expect(mocks.completeOnboarding).not.toHaveBeenCalled();
   });
 
   it("keeps onboarding's answers when the join fails", async () => {
     await joinWith(false, new Error("list full"));
-    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.clearHandoff).not.toHaveBeenCalled();
     expect(mocks.alert).toHaveBeenCalledWith("sharedLists.joinFailed");
   });
 
   it("drops onboarding's queue and progress before finishing onboarding for a person who joined", async () => {
     await joinWith(false, "list1");
-    const [cleared] = mocks.clearPending.mock.invocationCallOrder;
+    const [cleared] = mocks.clearHandoff.mock.invocationCallOrder;
     const [forgot] = mocks.clearOnboardingProgress.mock.invocationCallOrder;
     const [completed] = mocks.completeOnboarding.mock.invocationCallOrder;
     expect(cleared).toBeLessThan(completed!);
     expect(forgot).toBeLessThan(completed!);
   });
 
-  it.each([
-    ["dropping onboarding's queue", mocks.clearPending, 0],
-    ["finishing onboarding", mocks.completeOnboarding, 1],
-  ])(
+  it.each([["finishing onboarding", mocks.completeOnboarding, 1]])(
     "still navigates and reports it when %s fails after the invite cleared",
     async (_step, store, onboardingCalls) => {
       const failure = new Error("keychain locked");

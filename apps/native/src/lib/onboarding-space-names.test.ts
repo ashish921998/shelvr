@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
-  clearPending,
-  getPendingSpaces,
-  resolveOnboardingSpaceName,
-  setPendingSpaces,
-} from "@/lib/pending-onboarding";
+  clearHandoff,
+  finishHandoff,
+  type OnboardingAnswers,
+} from "@/lib/onboarding-handoff";
 import { onboardingLabel } from "@/lib/onboarding-labels";
 
 const device = vi.hoisted(() => ({
@@ -19,6 +18,22 @@ vi.mock("expo-crypto", () => ({ randomUUID: () => "onboarding-test" }));
 vi.mock("expo-localization", () => ({
   getLocales: () => [{ languageTag: device.locale }],
 }));
+vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
+
+const KEY = "shelvr.pending.onboarding";
+
+const dateNight: OnboardingAnswers = {
+  goals: ["date"],
+  travelCity: null,
+  beenCities: [],
+  savedCount: null,
+  skippedShare: true,
+};
+
+function storedSpaces(): unknown {
+  return (JSON.parse(device.storage.get(KEY) ?? "{}") as { spaces?: unknown })
+    .spaces;
+}
 
 beforeEach(() => {
   device.locale = "en-US";
@@ -27,26 +42,28 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-it("names the picked topics' spaces in the language onboarding finishes in", () => {
+it("names the picked goals' spaces in the language onboarding finishes in", () => {
   device.locale = "de-DE";
-  setPendingSpaces(["Food & recipes"].map(resolveOnboardingSpaceName));
-  expect(getPendingSpaces()).toEqual([onboardingLabel("Food & recipes")]);
-  expect(getPendingSpaces()).not.toEqual(["Food & recipes"]);
+  finishHandoff(dateNight, null);
+  expect(storedSpaces()).toEqual([onboardingLabel("Date nights")]);
+  expect(storedSpaces()).not.toEqual(["Date nights"]);
 });
 
 it("keeps an old record's frozen names, and clears them with onboarding", () => {
   device.storage.set(
-    "shelvr.pending.onboarding",
+    KEY,
     JSON.stringify({
       operationId: "old",
-      spaces: ["Recipes"],
+      spaces: [],
       demoUrl: null,
       step: 3,
+      spaceNames: { "Date nights": "Date nights" },
     }),
   );
-  expect(resolveOnboardingSpaceName("Recipes")).toBe("Recipes");
   device.locale = "de-DE";
-  expect(resolveOnboardingSpaceName("Recipes")).toBe("Recipes");
-  clearPending();
-  expect(resolveOnboardingSpaceName("Recipes")).toBe("Rezepte");
+  finishHandoff(dateNight, null);
+  expect(storedSpaces()).toEqual(["Date nights"]);
+  clearHandoff();
+  finishHandoff(dateNight, null);
+  expect(storedSpaces()).toEqual(["Date-Abende"]);
 });

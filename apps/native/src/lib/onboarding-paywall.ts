@@ -1,10 +1,7 @@
 import { analytics } from "@/lib/analytics";
 import { notePurchaseBeforeSignIn } from "@/lib/purchase-before-sign-in";
 import { openPaywallOutcome, useEntitlement } from "@/lib/entitlement";
-import {
-  noteDeclinedDuringOnboarding,
-  notePurchasedDuringOnboarding,
-} from "@/lib/replay-onboarding";
+import { notePaywallAnswer } from "@/lib/onboarding-handoff";
 import { useConvexAuth } from "convex/react";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -48,14 +45,14 @@ export function useOnboardingPaywall({
       .then((outcome) => {
         if (outcome === "unavailable") return handlers.current.onUnavailable();
         if (outcome === "cancelled") {
-          if (isAuthenticated) noteDeclinedDuringOnboarding();
+          if (isAuthenticated) notePaywallAnswer("declined");
           if (handlers.current.onClosed) return handlers.current.onClosed();
           started.current = false;
           setWaitedOut(false);
           setAsked(false);
           return;
         }
-        notePurchasedDuringOnboarding();
+        notePaywallAnswer("purchased");
         if (!isAuthenticated) notePurchaseBeforeSignIn();
         handlers.current.onPro();
       })

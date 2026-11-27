@@ -3,9 +3,9 @@ import { Platform, Settings } from "react-native";
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { forgetStoredSession } from "@/lib/auth-storage";
 import { forgetOnboarded } from "@/lib/onboarding";
+import { clearHandoff } from "@/lib/onboarding-handoff";
 import { clearOnboardingProgress } from "@/lib/onboarding-progress";
 import { clearQueuedCityStamps } from "@/lib/pending-city-stamps";
-import { clearPending } from "@/lib/pending-onboarding";
 import { clearPurchaseBeforeSignIn } from "@/lib/purchase-before-sign-in";
 import { clearQueued } from "@/lib/queued-first-save";
 import {
@@ -39,7 +39,7 @@ export function startFreshForE2E(): void {
   }
   forgetStoredSession();
   forgetOnboarded();
-  clearPending();
+  clearHandoff();
   clearOnboardingProgress();
   clearQueued();
   clearQueuedCityStamps();

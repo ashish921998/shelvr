@@ -3,7 +3,7 @@ import { t } from "@/lib/i18n";
 import { useOnboarding } from "@/lib/onboarding";
 import { holdIncomingShare } from "@/lib/onboarding-exit";
 import { clearOnboardingProgress } from "@/lib/onboarding-progress";
-import { clearPending } from "@/lib/pending-onboarding";
+import { clearHandoff } from "@/lib/onboarding-handoff";
 import {
   clearPendingInvite,
   getPendingInvite,
@@ -66,7 +66,7 @@ export function inviteJoinOutcome(
 function finishOnboarding(completeOnboarding: () => void) {
   holdIncomingShare();
   try {
-    clearPending();
+    clearHandoff();
     clearOnboardingProgress();
     completeOnboarding();
   } catch (error) {

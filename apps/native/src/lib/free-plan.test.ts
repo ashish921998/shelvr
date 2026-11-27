@@ -13,7 +13,7 @@ vi.mock("@convex/_generated/api", () => ({
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ entitled: false, loading: false }),
 }));
-vi.mock("@/lib/replay-onboarding", () => ({
+vi.mock("@/lib/onboarding-handoff", () => ({
   useAwaitingOnboardingPurchase: () => false,
 }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));

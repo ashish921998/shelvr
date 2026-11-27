@@ -1,7 +1,7 @@
 /**
  * Device binding for the pending-share flag and the discarded-share record.
  * SecureStore keeps both across process death the same way onboarding and
- * pending-onboarding do. Empty string means "not set" because SecureStore's
+ * its handoff do. Empty string means "not set" because SecureStore's
  * delete is async-only.
  */
 import * as SecureStore from "expo-secure-store";
