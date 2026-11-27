@@ -100,6 +100,7 @@ struct OnboardingForm: View {
   @State private var practiceShare = false
   @State private var carousel = 0
   @State private var openerPages = Set<Int>()
+  @State private var finished = false
 
   init(account: String?, onSignIn: ((WelcomeHandoff.Purpose) -> Void)?, onFinished: @escaping () -> Void = {}) {
     self.account = account
@@ -501,12 +502,13 @@ struct OnboardingForm: View {
   }
 
   private func finish() {
-    guard let account, backend.userID == account else { return }
+    guard !finished, let account, backend.userID == account else { return }
     let entry = OnboardingHandoff(cities: progress.visitedCities.sorted(), url: progress.skippedShare ? nil : reel?.url,
       operation: progress.demoOperationID, space: nil)
-    Analytics.capture("onboarding_completed", progress.completedProperties)
     do {
       try entry.save(account)
+      finished = true
+      Analytics.capture("onboarding_completed", progress.completedProperties, distinctId: account)
       onFinished()
       UserDefaults.standard.removeObject(forKey: WelcomeHandoff.progressKey(account))
     } catch { errorKey = "errors.tryAgain" }

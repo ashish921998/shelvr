@@ -39,11 +39,12 @@ struct OnboardingReplay: ViewModifier {
     func read() -> OnboardingHandoff? {
       UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(OnboardingHandoff.self, from: $0) }
     }
-    while !Task.isCancelled, generation == backend.sessionGeneration, let entry = read() {
+    while !Task.isCancelled, generation == backend.sessionGeneration, backend.userID == account, let entry = read() {
       do {
+        var stamped: Double?
         if stamps {
           guard !entry.cities.isEmpty else { return }
-          let _: Double = try await backend.client.mutation("cityStamps:claimOnboardingCityStamps",
+          stamped = try await backend.client.mutation("cityStamps:claimOnboardingCityStamps",
             with: ["cities": entry.cities.map { $0 as (any ConvexEncodable)? }])
         } else if let url = entry.url {
           var saved = false
@@ -70,10 +71,13 @@ struct OnboardingReplay: ViewModifier {
           guard saved else { return }
         } else { return }
         try Task.checkCancellation()
-        guard generation == backend.sessionGeneration, let latest = read(), latest.operation == entry.operation else { return }
+        guard generation == backend.sessionGeneration, backend.userID == account,
+          let latest = read(), latest.operation == entry.operation else { return }
         if let pending = latest.remaining(afterStamps: stamps) { try pending.save(account) }
         else { UserDefaults.standard.removeObject(forKey: key) }
-        if !stamps { Analytics.capture("onboarding_demo_submitted") }
+        if let stamped {
+          Analytics.capture("passport_city_stamps_claimed", ["picked": entry.cities.count, "stamped": stamped], distinctId: account)
+        } else { Analytics.capture("onboarding_demo_submitted") }
         return
       } catch {
         if Task.isCancelled { return }
