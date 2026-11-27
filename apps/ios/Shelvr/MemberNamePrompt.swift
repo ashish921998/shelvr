@@ -13,7 +13,7 @@ final class MemberNamePrompts {
 }
 
 struct MemberNamePrompt: View {
-  let creating: Bool
+  let kind: String
   let done: () -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
@@ -28,7 +28,7 @@ struct MemberNamePrompt: View {
         Section {
           TextField(copy("sharedLists.yourName"), text: $name).textContentType(.givenName)
         } footer: {
-          Text(copy(creating ? "sharedLists.nameBodyCreate" : "sharedLists.nameBodyJoinNoName"))
+          Text(copy(kind == "create" ? "sharedLists.nameBodyCreate" : "sharedLists.nameBodyJoinNoName"))
         }
         Button(copy("common.save")) {
           let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -38,12 +38,16 @@ struct MemberNamePrompt: View {
             defer { saving = false }
             do {
               let _: String = try await backend.client.mutation("users:setMyName", with: ["name": clean])
+              Analytics.capture("shared_list_name_prompt", ["kind": kind, "outcome": "named"])
               dismiss()
               done()
             } catch { failed = true }
           }
         }.disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.utf16.count > 80)
-        Button(copy("sharedLists.nameSkip")) { dismiss(); done() }.disabled(saving)
+        Button(copy("sharedLists.nameSkip")) {
+          Analytics.capture("shared_list_name_prompt", ["kind": kind, "outcome": "skipped"])
+          dismiss(); done()
+        }.disabled(saving)
       }
       .navigationTitle(copy("sharedLists.nameTitle"))
       .interactiveDismissDisabled(saving)

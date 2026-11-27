@@ -65,6 +65,7 @@ private struct CityMapExport<Art: View>: View {
         ShareLink(item: bitmap, preview: SharePreview(name, image: bitmap)) {
           Label(copy("common.share"), systemImage: "square.and.arrow.up")
         }.buttonStyle(.borderedProminent)
+          .simultaneousGesture(TapGesture().onEnded { Analytics.capture("city_card_share_sheet_opened", ["place_count": pins.count, "visited_count": went.count]) })
       } else { ProgressView() }
     }.task(id: Key(pins: pins, went: went)) {
       let renderer = ImageRenderer(content: art)

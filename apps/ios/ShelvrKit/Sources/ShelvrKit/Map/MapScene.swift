@@ -28,23 +28,25 @@ public struct MapScene {
 
   public var showsWentSwitch: Bool { !visited.isEmpty }
 
-  public init(saved: [MapPlace]?, discover: [MapPlace], visits: [MapVisit], filters: MapFilters) {
+  public init(saved: [MapPlace]?, discover: [MapPlace], visits: [MapVisit], filters: MapFilters,
+    catalog: [MapPlace] = []) {
     let own = saved ?? []
     let visited = MapVisit.visitedIDs(visits, among: own)
     var effective = filters
     if visited.isEmpty { effective.went = .all }
 
-    let entries = MapPlace.combined(saved: own, discover: effective.went == .all ? discover : [])
-    let matches = entries.filter { place in
-      (effective.went == .all || visited.contains(place.id) == (effective.went == .went)) &&
-        (effective.kinds.isEmpty || !effective.kinds.isDisjoint(with: place.kinds))
+    let allPlaces = effective.went == .all
+    let entries = MapPlace.combined(saved: own, discover: allPlaces ? discover : [])
+    let scoped = entries.filter { allPlaces || visited.contains($0.id) == (effective.went == .went) }
+    let matching = MapPlace.search(scoped, catalog: allPlaces ? catalog : [], query: effective.search)
+    let visible = matching.filter { place in
+      effective.kinds.isEmpty || !effective.kinds.isDisjoint(with: place.kinds)
     }
-    let visible = MapPlace.search(matches, query: effective.search)
 
     self.filters = effective
     self.visited = visited
     self.visible = visible
-    self.chips = Self.filterKinds(entries, selected: effective.kinds)
+    self.chips = Self.filterKinds(catalog.isEmpty ? entries : matching, selected: effective.kinds)
     self.opening = saved.flatMap { saved in
       if effective.isActive { return visible.isEmpty ? nil : visible }
       return Self.busiestCity(in: saved.isEmpty ? discover : saved)

@@ -23,6 +23,31 @@ import Testing
   #expect(pendingInMap.consume() == nil)
 }
 
+@MainActor @Test func aSearchFitsOnceMoreWhenItsCatalogResponseArrives() {
+  let search = MapCameraCommand(action: .fitFilteredPlaces, refitWhenCatalogArrives: true)
+  guard case .fitFilteredPlaces? = search.consume() else {
+    Issue.record("Existing matches must fit immediately")
+    return
+  }
+
+  #expect(search.takeCatalogRefit())
+  #expect(search.consume() == nil)
+  #expect(!search.takeCatalogRefit())
+}
+
+@MainActor @Test func cancelledAndOrdinaryFitsIgnoreCatalogResponses() {
+  let search = MapCameraCommand(action: .fitFilteredPlaces, refitWhenCatalogArrives: true)
+  _ = search.consume()
+  search.cancel()
+  #expect(!search.takeCatalogRefit())
+  #expect(search.consume() == nil)
+
+  let category = MapCameraCommand(action: .fitFilteredPlaces)
+  _ = category.consume()
+  #expect(!category.takeCatalogRefit())
+  #expect(category.consume() == nil)
+}
+
 @Test func cancelledLocationRequestIgnoresALateFixAndCanStartAgain() {
   var request = MapLocationRequest()
   let coordinate = CLLocationCoordinate2D(latitude: 37.77, longitude: -122.42)

@@ -31,6 +31,7 @@ struct AccountSettingsView: View {
         Link(copy("legal.terms"), destination: URL(string: "https://tryshelvr.app/terms")!)
         Link(copy("legal.privacy"), destination: URL(string: "https://tryshelvr.app/privacy")!)
       }
+      RefundSharingPreference()
       Section {
         Button(copy(deleting ? "account.deleting" : "account.delete"), role: .destructive) {
           confirming = true

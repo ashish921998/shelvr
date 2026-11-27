@@ -35,6 +35,7 @@ private enum BillingFailure: Error { case unavailable }
 
 struct BillingSheet: View {
   let destination: BillingDestination
+  var placement = "pro_gate"
   var goalVariables: [String: String] = [:]
   var availabilityChanged: (Bool) -> Void = { _ in }
   var confirmed: () -> Void = {}
@@ -48,6 +49,7 @@ struct BillingSheet: View {
   @State private var attempt = 0
   @State private var noPurchase = false
   @State private var confirmation = BillingConfirmation()
+  @State private var paywall: PaywallAttempt?
 
   var body: some View {
     Group {
@@ -66,28 +68,36 @@ struct BillingSheet: View {
         ProgressView(copy("pro.checking"))
       } else if userID != nil, destination == .manage {
         CustomerCenterView()
-          .onCustomerCenterRestoreCompleted { info in finish(info) }
+          .onCustomerCenterRestoreCompleted { info in finish(info, restored: true) }
       } else if let offer, userID != nil {
         PaywallView(offering: offer.offering, displayCloseButton: true)
           .customPaywallVariables(offer.variables.merging(goalVariables.mapValues(CustomVariableValue.string)) { $1 })
           .onRequestedDismissal { if confirmation.state != .syncing { dismiss() } }
-          .onPurchaseCompleted { info in finish(info) }
-          .onRestoreCompleted { info in finish(info) }
+          .onPurchaseCompleted { info in finish(info, restored: false) }
+          .onRestoreCompleted { info in finish(info, restored: true) }
       } else {
         ProgressView()
       }
     }
     .interactiveDismissDisabled(confirmation.state == .syncing)
+    .onDisappear { capture(paywall?.finish(.cancelled) ?? []) }
     .task(id: attempt) {
       let generation = backend.sessionGeneration
       failed = false
       availabilityChanged(true)
+      if destination == .paywall {
+        let next = PaywallAttempt(placement: attempt == 0 ? placement : "retry")
+        paywall = next
+        Analytics.capture("paywall_requested", next.requested)
+      }
+      var reason = "identity_not_ready"
       do {
         for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
           guard let id = user?._id else { throw BillingFailure.unavailable }
           try await BillingIdentity.select(id, environment: backend.environment)
           try Task.checkCancellation()
           if destination == .paywall {
+            reason = "sdk_unavailable"
             guard let current = try await PaywallOffer.load(copy: copy) else { throw BillingFailure.unavailable }
             offer = current
           }
@@ -95,23 +105,44 @@ struct BillingSheet: View {
           guard backend.sessionGeneration == generation else { return }
           session = generation
           userID = id
+          if destination == .paywall, let offer,
+            let started = paywall?.present(offeringID: offer.offering.identifier, trialEligible: offer.trialEligible) {
+            Analytics.capture("paywall_presentation_started", started)
+          }
           if destination == .restore {
             let info = try await Purchases.shared.restorePurchases()
             try Task.checkCancellation()
             guard backend.sessionGeneration == generation, Purchases.shared.appUserID == id else { return }
-            let key = backend.environment.variant == .production ? "Shelvr Pro" : "shelvr_pro"
-            if info.entitlements.active[key] == nil { noPurchase = true } else { sync() }
+            if info.entitlements.active[proKey] == nil { noPurchase = true } else {
+              if let event = PaywallFunnel.shared.recordAccess(.restore, unlessActive: true) { Analytics.capture("entitlement_activated", event) }
+              sync()
+            }
           }
           return
         }
-      } catch { if !Task.isCancelled { failed = true; availabilityChanged(false) } }
+      } catch {
+        if !Task.isCancelled {
+          failed = true
+          availabilityChanged(false)
+          if let event = paywall?.failed(reason) { Analytics.capture("paywall_failed", event) }
+        }
+      }
     }
   }
 
-  private func finish(_ info: CustomerInfo) {
-    let key = backend.environment.variant == .production ? "Shelvr Pro" : "shelvr_pro"
-    guard info.entitlements.active[key] != nil else { return }
+  private var proKey: String { backend.environment.variant == .production ? "Shelvr Pro" : "shelvr_pro" }
+
+  private func finish(_ info: CustomerInfo, restored: Bool) {
+    guard let entitlement = info.entitlements.active[proKey] else { return }
+    if destination == .paywall {
+      capture(paywall?.finish(restored ? .restored : .purchased, productID: entitlement.productIdentifier) ?? [])
+      if let event = PaywallFunnel.shared.recordAccess(restored ? .restore : .purchase) { Analytics.capture("entitlement_activated", event) }
+    }
     sync()
+  }
+
+  private func capture(_ events: [(String, [String: Any])]) {
+    for (event, properties) in events { Analytics.capture(event, properties) }
   }
 
   private func sync() {

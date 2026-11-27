@@ -24,7 +24,7 @@ struct PhotoSaveView: View {
       if let failure {
         Text(copy(failure)).foregroundStyle(.red)
         if failure == "freePlan.photosNeedPro" {
-          Button(copy("freePlan.seePlans")) { offered = operationID; billing = .paywall }
+          Button(copy("freePlan.seePlans")) { offered = operationID; PaywallFunnel.shared.block("add"); billing = .paywall }
         }
       }
     }
@@ -34,7 +34,7 @@ struct PhotoSaveView: View {
         .disabled(selection == nil || request != nil)
     }
     .sheet(item: $billing) { destination in
-      BillingSheet(destination: destination, confirmed: {
+      BillingSheet(destination: destination, placement: "add", confirmed: {
         if offered == operationID, selection != nil { request = UUID() }
       })
     }
@@ -69,14 +69,16 @@ struct PhotoSaveView: View {
       }
       guard !Task.isCancelled, request == id, backend.userID == owner, backend.sessionGeneration == session else { return }
       Analytics.capture("images_saved", ["image_count": 1])
+      if let resumed = PaywallFunnel.shared.resume("add") { Analytics.capture("paywall_blocked_action_resumed", resumed) }
       dismiss()
     } catch {
       if !Task.isCancelled, request == id, backend.userID == owner, backend.sessionGeneration == session {
         let saveFailure = SaveFailure(error)
         failure = saveFailure.photoCopyKey
         Analytics.capture("save_failed", properties.merging(["stage": saveFailure.stage]) { $1 })
+        Analytics.capture("images_save_failed", ["reason": saveFailure.imageReason, "image_count": 1])
         if failure == "freePlan.photosNeedPro" && offered != operationID {
-          offered = operationID; billing = .paywall
+          offered = operationID; PaywallFunnel.shared.block("add"); billing = .paywall
         }
       }
     }

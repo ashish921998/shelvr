@@ -1,3 +1,4 @@
+import CoreLocation
 import MapKit
 import ShelvrKit
 import SwiftUI
@@ -11,8 +12,12 @@ struct SavedPlacesMap: View {
   @Environment(\.colorScheme) private var scheme
   @Environment(\.dynamicTypeSize) private var typeSize
   @AppStorage("swift.appearance") private var appearance = "system"
+  @ScaledMetric(relativeTo: .body) private var searchControlHeight: CGFloat = 44
   @State private var saved: [MapPlace]?
   @State private var discoverResponse: AreaResponse?
+  @State private var catalogResponse: CatalogResponse?
+  @State private var failedCatalogRequest: CatalogRequest?
+  @State private var catalogGeneration = UUID()
   @State private var visits: [MapVisit] = []
   @State private var discoverRequest = AreaRequest(area: .world)
   @State private var filters = MapFilters()
@@ -30,13 +35,17 @@ struct SavedPlacesMap: View {
   @State private var locateFrame: CGRect?
   @State private var searching = false
   @State private var resultsOpen = true
+  @State private var reportedOpen = false
   @FocusState private var focusedSearch: Bool
 
   var body: some View {
     let request = discoverRequest
     let discover = discoverResponse?.places ?? []
     let complete = discoverResponse?.request == request ? discoverResponse?.complete : nil
-    let scene = MapScene(saved: saved, discover: discover, visits: visits, filters: filters)
+    let search = catalogRequest
+    let catalog = catalogResponse?.request == search ? catalogResponse?.results : nil
+    let catalogFailed = search != nil && failedCatalogRequest == search
+    let scene = MapScene(saved: saved, discover: discover, visits: visits, filters: filters, catalog: catalog?.places ?? [])
     let palette = HomeChromePalette(scheme, appearance: appearance)
     let personalPlaces = saved ?? []
     let overviewPlaces = scene.visible.filter(\.isSaved)
@@ -48,7 +57,11 @@ struct SavedPlacesMap: View {
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
         Group {
-          if searching { searchPanel(scene, palette: palette) }
+          if searching {
+            searchPanel(scene, palette: palette,
+              catalogLoading: search != nil && catalog == nil && !catalogFailed, catalogFailed: catalogFailed,
+              showAttribution: catalog?.includesOverture == true)
+          }
           else { mapHeader(personalPlaces: personalPlaces, overviewPlaces: overviewPlaces, palette: palette) }
         }.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topControlsHeight = $0 }
       }
@@ -72,6 +85,14 @@ struct SavedPlacesMap: View {
         if let fix = location.latestFix { moveCamera(.locate(fix.coordinate)) }
       }
       .onChange(of: focusedSearch) { _, focused in searchFocusChanged(focused) }
+      .onChange(of: saved != nil && (discoverResponse != nil || errors.contains("discover")), initial: true) { _, settled in
+        guard settled, !reportedOpen, let saved else { return }
+        reportedOpen = true
+        let status = CLLocationManager().authorizationStatus
+        Analytics.capture("map_opened", ["count": saved.count, "discover": discover.count,
+          "located": status == .authorizedWhenInUse || status == .authorizedAlways,
+          "opening": saved.isEmpty ? "default" : "fit"])
+      }
       .onDisappear { searchFocusChanged(false) }
       .alert(copy("common.unavailable"), isPresented: $location.unavailable) {
         Button(copy("common.close")) {}
@@ -106,6 +127,7 @@ struct SavedPlacesMap: View {
           }
         }
       }
+      .task(id: search) { await searchCatalog(search) }
       .task(id: selected) {
         guard let place = selected else { return }
         guard let owner = backend.userID else { return }
@@ -132,6 +154,7 @@ struct SavedPlacesMap: View {
   }
 
   private func selectPlace(_ place: MapPlace) {
+    cancelCameraRequests()
     selectedLabelID = place.id
     selected = place
   }
@@ -273,8 +296,10 @@ struct SavedPlacesMap: View {
     }
   }
 
-  private func searchPanel(_ scene: MapScene, palette: HomeChromePalette) -> some View {
-    VStack(spacing: 8) {
+  private func searchPanel(_ scene: MapScene, palette: HomeChromePalette, catalogLoading: Bool,
+    catalogFailed: Bool, showAttribution: Bool) -> some View {
+    let controlHeight = max(44, searchControlHeight)
+    return VStack(spacing: 8) {
       HStack(spacing: 8) {
         HStack(spacing: 8) {
           Image(systemName: "magnifyingglass").accessibilityHidden(true)
@@ -285,35 +310,69 @@ struct SavedPlacesMap: View {
             .onSubmit { focusedSearch = false }
             .onChange(of: focusedSearch) { if focusedSearch { resultsOpen = true } }
         }
-        .padding(.horizontal, 16).frame(minHeight: 52)
+        .padding(.horizontal, 16).frame(minHeight: controlHeight)
         .background(palette.surface, in: Capsule())
         .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5) }
-        Button(copy("common.cancel")) {
+        Button {
           searching = false
           focusedSearch = false
           updateSearch("")
-        }.padding(.horizontal, 12).frame(minHeight: 44)
-          .background(palette.surface, in: Capsule())
+        } label: {
+          Text(copy("common.cancel"))
+            .padding(.horizontal, 12).frame(minHeight: controlHeight)
+            .background(palette.surface, in: Capsule())
+            .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5).allowsHitTesting(false) }
+            .contentShape(Capsule())
+        }
       }
+      .frame(minHeight: 50)
       if focusedSearch { filterStrip(scene, palette: palette).padding(.horizontal, -20) }
-      retryControl(palette)
-      if scene.filters.hasSearch && resultsOpen && (!scene.visible.isEmpty || errors.isEmpty) {
-        VStack(alignment: .leading, spacing: 0) {
+      retryControl(palette, catalogFailed: catalogFailed)
+      if showAttribution, !scene.visible.isEmpty, let url = URL(string: "https://docs.overturemaps.org/attribution/") {
+        Link("Overture Maps", destination: url)
+          .font(.caption)
+          .foregroundStyle(palette.muted)
+          .padding(.horizontal, 12)
+          .frame(minHeight: 44)
+          .background(palette.surface, in: Capsule())
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .layoutPriority(1)
+      }
+      if scene.filters.hasSearch && resultsOpen && (!scene.visible.isEmpty || (errors.isEmpty && !catalogFailed)) {
+        let results = VStack(alignment: .leading, spacing: 0) {
           ForEach(scene.visible.prefix(5)) { place in
             Button {
               Analytics.capture("map_search_result_opened")
               focusedSearch = false
               resultsOpen = false
               selectPlace(place)
+              if !place.isSaved { moveCamera(.overview([place])) }
             } label: {
-              Label(place.name, systemImage: place.isSaved ? "bookmark" : "mappin")
-                .lineLimit(1).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+              HStack(spacing: 8) {
+                Image(systemName: place.isSaved ? "bookmark" : "mappin").accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(place.name).lineLimit(1)
+                  if !place.isSaved, let city = place.city {
+                    Text(city).font(.caption).foregroundStyle(palette.muted).lineLimit(1)
+                  }
+                }
+              }
+              .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+              .contentShape(Rectangle())
             }
           }
           if scene.visible.isEmpty {
-            Text(copy("map.searchNoResults", ["query": filters.search])).font(.caption)
-              .padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
+            if catalogLoading {
+              ProgressView(copy("common.loading")).font(.caption).padding(.vertical, 8)
+            } else {
+              Text(copy("map.searchNoResults", ["query": filters.search])).font(.caption)
+                .padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
+            }
           }
+        }
+        ViewThatFits(in: .vertical) {
+          results
+          ScrollView { results }.scrollBounceBehavior(.basedOnSize)
         }
         .padding(.horizontal, 16).padding(.vertical, 6)
         .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
@@ -329,8 +388,8 @@ struct SavedPlacesMap: View {
   }
 
   @ViewBuilder
-  private func retryControl(_ palette: HomeChromePalette) -> some View {
-    if !errors.isEmpty {
+  private func retryControl(_ palette: HomeChromePalette, catalogFailed: Bool = false) -> some View {
+    if !errors.isEmpty || catalogFailed {
       Button(copy("common.retry")) {
         retry += 1
         discoverRequest = AreaRequest(area: discoverRequest.area)
@@ -345,9 +404,9 @@ struct SavedPlacesMap: View {
     Button(action: action) {
       Image(systemName: symbol).font(.system(size: 17, weight: .medium))
         .foregroundStyle(palette.foreground)
-        .frame(width: 40, height: 40).background(palette.surface, in: Circle())
+        .frame(width: 44, height: 44).background(palette.surface, in: Circle())
         .shadow(color: palette.shadow.opacity(0.20), radius: 3, y: 2)
-        .frame(width: 44, height: 44).contentShape(Rectangle())
+        .contentShape(Rectangle())
     }.accessibilityLabel(label)
   }
 
@@ -410,12 +469,14 @@ struct SavedPlacesMap: View {
     cameraCommand?.cancel()
   }
 
-  private func moveCamera(_ action: MapCameraCommand.Action) {
+  private func moveCamera(_ action: MapCameraCommand.Action, refitWhenCatalogArrives: Bool = false) {
     cameraCommand?.cancel()
-    cameraCommand = .init(action: action)
+    cameraCommand = .init(action: action, refitWhenCatalogArrives: refitWhenCatalogArrives)
   }
 
   private func updateSearch(_ text: String) {
+    guard filters.search != text else { return }
+    catalogGeneration = UUID()
     var next = filters
     next.search = text
     applyFilters(next)
@@ -426,7 +487,8 @@ struct SavedPlacesMap: View {
     location.cancel()
     filters = next
     selectedLabelID = nil
-    moveCamera(.fitFilteredPlaces)
+    let request = catalogRequest
+    moveCamera(.fitFilteredPlaces, refitWhenCatalogArrives: request != nil && catalogResponse?.request != request)
   }
 
   private func chipLabel(_ title: String?, symbol: String, selected: Bool, palette: HomeChromePalette,
@@ -477,6 +539,41 @@ struct SavedPlacesMap: View {
     let request: AreaRequest
     let places: [MapPlace]
     let complete: Bool
+  }
+
+  private struct CatalogRequest: Equatable {
+    let text: String
+    let generation: UUID
+    let session: UUID
+    let retry: Int
+  }
+
+  private struct CatalogResponse {
+    let request: CatalogRequest
+    let results: Backend.CatalogPlaces
+  }
+
+  private var catalogRequest: CatalogRequest? {
+    let text = filters.search.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard searching, !text.isEmpty else { return nil }
+    if filters.went != .all, !MapVisit.visitedIDs(visits, among: saved ?? []).isEmpty { return nil }
+    return CatalogRequest(text: text, generation: catalogGeneration, session: backend.sessionGeneration, retry: retry)
+  }
+
+  private func searchCatalog(_ request: CatalogRequest?) async {
+    guard let request else { return }
+    do {
+      try await Task.sleep(for: .milliseconds(250))
+      for try await results in backend.catalogPlaces(matching: request.text) {
+        try Task.checkCancellation()
+        guard request == catalogRequest else { return }
+        catalogResponse = CatalogResponse(request: request, results: results)
+        failedCatalogRequest = nil
+        if cameraCommand?.takeCatalogRefit() == true { moveCamera(.fitFilteredPlaces) }
+      }
+    } catch {
+      if !Task.isCancelled, request == catalogRequest { failedCatalogRequest = request }
+    }
   }
 
   private func subscribe(_ key: String, _ update: () async throws -> Void) async {
