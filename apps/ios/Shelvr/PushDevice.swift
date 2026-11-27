@@ -9,6 +9,17 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
   @Published private(set) var authorizationRevision = 0
   @Published private(set) var blockedSession: UUID?
 
+  func requestAuthorization() async throws -> Bool {
+    let center = UNUserNotificationCenter.current()
+    let fresh = await center.notificationSettings().authorizationStatus == .notDetermined
+    let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
+    if fresh {
+      let status = await center.notificationSettings().authorizationStatus
+      Analytics.capture("notification_permission_result", ["outcome": status == .provisional ? "provisional" : granted ? "granted" : "denied"])
+    }
+    return granted
+  }
+
   func retryEnrollment() {
     if delivery.rotationDeferred { delivery = PushDeliveryState() }
     blockedSession = nil

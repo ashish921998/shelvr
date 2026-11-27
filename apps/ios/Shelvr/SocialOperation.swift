@@ -3,20 +3,31 @@ import SwiftUI
 
 @MainActor @Observable
 final class SocialOperation {
+  let placement: String
   var billing: BillingDestination?
   var failed = false
   private(set) var busy = false
   private var resume: (@MainActor () async throws -> Void)?
+  private var blockedHere = false
+
+  init(placement: String = "pro_gate") { self.placement = placement }
 
   func run(_ action: @escaping @MainActor () async throws -> Void, allowPurchase: Bool = true) {
     guard !busy, billing == nil else { return }
     busy = true
     Task {
       defer { busy = false }
-      do { try await action() }
-      catch {
+      do {
+        try await action()
+        if blockedHere, let event = PaywallFunnel.shared.resume(placement) {
+          blockedHere = false
+          Analytics.capture("paywall_blocked_action_resumed", event)
+        }
+      } catch {
         if allowPurchase && SaveFailure(error) == .proRequired {
+          PaywallFunnel.shared.block(placement)
           resume = action
+          blockedHere = true
           billing = .paywall
         } else { failed = true }
       }
@@ -42,7 +53,7 @@ extension View {
   func socialOperation(_ operation: SocialOperation, failure: String, close: String) -> some View {
     @Bindable var operation = operation
     return sheet(item: $operation.billing, onDismiss: { operation.dismissed() }) { destination in
-      BillingSheet(destination: destination, confirmed: { operation.confirmed() })
+      BillingSheet(destination: destination, placement: operation.placement, confirmed: { operation.confirmed() })
     }
     .alert(failure, isPresented: $operation.failed) { Button(close) {} }
   }

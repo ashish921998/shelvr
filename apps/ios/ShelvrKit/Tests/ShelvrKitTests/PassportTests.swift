@@ -68,3 +68,29 @@ private func stamp(_ name: String, _ city: String?, _ country: String? = nil,
   #expect(story.more == vector.expected.more)
   #expect(story.fromReels == vector.expected.fromReels)
 }
+
+@Test func stampCatalogLooksAreDistinctEnough() {
+  let catalog = StampCity.catalog
+  #expect(catalog.count == 25)
+  #expect(catalog.allSatisfy { (0..<6).contains($0.look.ink) })
+  let shared = Dictionary(grouping: catalog, by: \.look).values.filter { $0.count > 1 }
+  #expect(shared.count <= 1)
+  #expect(shared.allSatisfy { $0.count == 2 })
+  for (a, b) in zip(catalog, catalog.dropFirst()) { #expect(a.look.ink != b.look.ink) }
+  let byID = Dictionary(uniqueKeysWithValues: catalog.map { ($0.id, $0.look) })
+  for pair in [("rome", "milan"), ("rome", "florence"), ("milan", "florence")] {
+    #expect(byID[pair.0]!.ink != byID[pair.1]!.ink)
+    #expect(byID[pair.0]!.shape != byID[pair.1]!.shape)
+  }
+  for group in Dictionary(grouping: catalog, by: \.country).values {
+    #expect(Set(group.map(\.look)).count == group.count)
+  }
+}
+
+@Test func contourLoopsAreSeededAndClosed() {
+  let loops = ContourLoops.loops(seed: 7)
+  #expect(loops == ContourLoops.loops(seed: 7))
+  #expect(loops != ContourLoops.loops(seed: 8))
+  #expect(loops.count == ContourLoops.loopCount)
+  #expect(loops.allSatisfy { $0.first == $0.last && $0.count == ContourLoops.pointCount + 1 })
+}

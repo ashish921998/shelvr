@@ -1,3 +1,4 @@
+import CoreLocation
 import MapKit
 import ShelvrKit
 import SwiftUI
@@ -11,6 +12,7 @@ struct SavedPlacesMap: View {
   @Environment(\.colorScheme) private var scheme
   @Environment(\.dynamicTypeSize) private var typeSize
   @AppStorage("swift.appearance") private var appearance = "system"
+  @ScaledMetric(relativeTo: .body) private var searchControlHeight: CGFloat = 44
   @State private var saved: [MapPlace]?
   @State private var discoverResponse: AreaResponse?
   @State private var catalogResponse: CatalogResponse?
@@ -33,6 +35,7 @@ struct SavedPlacesMap: View {
   @State private var locateFrame: CGRect?
   @State private var searching = false
   @State private var resultsOpen = true
+  @State private var reportedOpen = false
   @FocusState private var focusedSearch: Bool
 
   var body: some View {
@@ -82,6 +85,14 @@ struct SavedPlacesMap: View {
         if let fix = location.latestFix { moveCamera(.locate(fix.coordinate)) }
       }
       .onChange(of: focusedSearch) { _, focused in searchFocusChanged(focused) }
+      .onChange(of: saved != nil && (discoverResponse != nil || errors.contains("discover")), initial: true) { _, settled in
+        guard settled, !reportedOpen, let saved else { return }
+        reportedOpen = true
+        let status = CLLocationManager().authorizationStatus
+        Analytics.capture("map_opened", ["count": saved.count, "discover": discover.count,
+          "located": status == .authorizedWhenInUse || status == .authorizedAlways,
+          "opening": saved.isEmpty ? "default" : "fit"])
+      }
       .onDisappear { searchFocusChanged(false) }
       .alert(copy("common.unavailable"), isPresented: $location.unavailable) {
         Button(copy("common.close")) {}
@@ -286,7 +297,8 @@ struct SavedPlacesMap: View {
 
   private func searchPanel(_ scene: MapScene, palette: HomeChromePalette, catalogLoading: Bool,
     catalogFailed: Bool, showAttribution: Bool) -> some View {
-    VStack(spacing: 8) {
+    let controlHeight = max(44, searchControlHeight)
+    return VStack(spacing: 8) {
       HStack(spacing: 8) {
         HStack(spacing: 8) {
           Image(systemName: "magnifyingglass").accessibilityHidden(true)
@@ -297,16 +309,22 @@ struct SavedPlacesMap: View {
             .onSubmit { focusedSearch = false }
             .onChange(of: focusedSearch) { if focusedSearch { resultsOpen = true } }
         }
-        .padding(.horizontal, 16).frame(minHeight: 52)
+        .padding(.horizontal, 16).frame(minHeight: controlHeight)
         .background(palette.surface, in: Capsule())
         .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5) }
-        Button(copy("common.cancel")) {
+        Button {
           searching = false
           focusedSearch = false
           updateSearch("")
-        }.padding(.horizontal, 12).frame(minHeight: 44)
-          .background(palette.surface, in: Capsule())
+        } label: {
+          Text(copy("common.cancel"))
+            .padding(.horizontal, 12).frame(minHeight: controlHeight)
+            .background(palette.surface, in: Capsule())
+            .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5).allowsHitTesting(false) }
+            .contentShape(Capsule())
+        }
       }
+      .frame(minHeight: 50)
       if focusedSearch { filterStrip(scene, palette: palette).padding(.horizontal, -20) }
       retryControl(palette, catalogFailed: catalogFailed)
       if scene.filters.hasSearch && resultsOpen && (!scene.visible.isEmpty || (errors.isEmpty && !catalogFailed)) {
@@ -375,9 +393,9 @@ struct SavedPlacesMap: View {
     Button(action: action) {
       Image(systemName: symbol).font(.system(size: 17, weight: .medium))
         .foregroundStyle(palette.foreground)
-        .frame(width: 40, height: 40).background(palette.surface, in: Circle())
+        .frame(width: 44, height: 44).background(palette.surface, in: Circle())
         .shadow(color: palette.shadow.opacity(0.20), radius: 3, y: 2)
-        .frame(width: 44, height: 44).contentShape(Rectangle())
+        .contentShape(Rectangle())
     }.accessibilityLabel(label)
   }
 

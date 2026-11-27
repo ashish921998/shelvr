@@ -10,6 +10,15 @@ public enum PlanRoutes {
     !allowedWithoutPersonalAccess(link)
   }
 
+  public static func proPlacement(_ link: AppLink) -> String? {
+    switch link.path {
+    case ["edit-save-places"]: "edit_places"
+    case ["date-plan"] where listID(link) == nil: "make_plan"
+    case ["new-trip"] where listID(link) == nil: "plan_trip"
+    default: nil
+    }
+  }
+
   public static func allowedWithoutPersonalAccess(_ link: AppLink) -> Bool {
     switch link.path.first {
     case "add-trip-stop", "shared-trip-links", "profile", "settings", "paywall", "list-invite", "passport-invite",

@@ -30,6 +30,7 @@ struct BlankTripView: View {
   @State private var message = ""
   @State private var busy = false
   @State private var request: Task<Void, Never>?
+  @State private var gate = SocialOperation(placement: "plan_trip")
 
   init(city: String, generate: @escaping (String) -> Void, created: @escaping (AppLink) -> Void) {
     _city = State(initialValue: city)
@@ -67,6 +68,7 @@ struct BlankTripView: View {
       if !message.isEmpty { Text(message) }
     }
     .disabled(busy).navigationTitle(copy(stayStage ? "tripPlanner.stay" : "tripSetup.title"))
+    .socialOperation(gate, failure: copy("tripPlanner.editFailed"), close: copy("common.close"))
     .onChange(of: start) { _, date in
       let max = Calendar.current.date(byAdding: .day, value: 14, to: date) ?? date
       end = min(max, Swift.max(date, end))
@@ -166,10 +168,16 @@ struct BlankTripView: View {
     request = Task {
       defer { busy = false }
       do {
-        let id = try await backend.createBlankTrip(name: name, countries: countries, city: city, days: dated ? BlankTrip.dayCount(start: start, end: end) : days,
+        let count = dated ? BlankTrip.dayCount(start: start, end: end) : days
+        let id = try await backend.createBlankTrip(name: name, countries: countries, city: city, days: count,
           start: dated ? start : nil, stay: stay, cover: cover?.base64EncodedString())
+        Analytics.capture("trip_blank_created", ["days": count, "dated": dated, "has_stay": stay != nil])
         if !Task.isCancelled, let link = AppLink("/trip-plan/" + id) { created(link) }
-      } catch { if !Task.isCancelled { message = copy("tripPlanner.editFailed") } }
+      } catch {
+        guard !Task.isCancelled else { return }
+        if SaveFailure(error) == .proRequired { gate.askToPurchase() }
+        else { message = copy("tripPlanner.editFailed") }
+      }
     }
   }
 
