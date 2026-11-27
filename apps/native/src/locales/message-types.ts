@@ -853,6 +853,9 @@ type MessageParams = {
   "map.searchNoResults": { query: string };
   "map.searchMore": { count: number; total: number };
   "map.showMyLocation": undefined;
+  "map.closedToday": undefined;
+  "map.openAllDay": undefined;
+  "map.hoursToday": { hours: string };
   "map.showAllCities": undefined;
   "map.continueTrip": { name: string };
   "navigation.trips": undefined;
