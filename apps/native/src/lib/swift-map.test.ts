@@ -15,7 +15,7 @@ import { CUISINES, PLACE_KINDS } from "@convex/model/placeKinds";
 import type { Id } from "@convex/_generated/dataModel";
 import vectors from "../../../ios/ShelvrKit/Tests/ShelvrKitTests/Fixtures/map-places.json";
 
-it("keeps the Swift map pin, filter and visit vectors current", () => {
+it("keeps the shared map fixtures and Expo filter order current", () => {
   const beside = discoverBeside(
     vectors.saved,
     vectors.discover.map(

@@ -7,7 +7,7 @@ import Testing
     let saved: [MapPlace.SavedRow]
     let discover: [MapPlace.DiscoverRow]
     let visits: [MapVisit]
-    let beside, kinds, went: [String]
+    let beside, went: [String]
     let emoji: [String?]
   }
   let file = try #require(Bundle.module.url(forResource: "map-places", withExtension: "json"))
@@ -19,9 +19,24 @@ import Testing
     return placeID
   }
   #expect(discoverIDs == golden.beside)
-  #expect(scene.chips.map(\.rawValue) == golden.kinds)
   #expect(saved.map(\.emoji) == golden.emoji)
   #expect(zip(golden.saved, saved).filter { scene.visited.contains($0.1.id) }.map { $0.0.itemId } == golden.went)
+}
+
+@Test func mapShowsSixCategoriesInStableOrderWhenTheyHaveMatches() {
+  let places = PlaceKind.allCases.reversed().map { kind in
+    MapPlace(source: .saved(itemID: kind.rawValue), name: kind.rawValue, lat: 0, lng: 0,
+      appleId: nil, city: nil, category: nil, cuisine: nil, kinds: [kind])
+  }
+  let scene = MapScene(saved: places, discover: [], visits: [], filters: .init())
+  #expect(scene.chips == [.food, .coffee, .activities, .drinks, .dessert, .shopping])
+  let searched = MapScene(saved: places, discover: [], visits: [], filters: .init(search: "shopping"))
+  #expect(searched.chips == [.shopping])
+
+  let sparse = places.filter { $0.kinds == [.shopping] }
+  let selected = MapScene(saved: sparse, discover: [], visits: [], filters: .init(kinds: [.dessert]))
+  #expect(selected.chips == [.dessert, .shopping])
+  #expect(selected.visible.isEmpty)
 }
 
 @Test func nameMatchesAppearAheadOfCityMatchesBeforeTruncation() throws {
@@ -84,6 +99,7 @@ import Testing
   let went = MapScene(saved: saved, discover: discover, visits: visits, filters: .init(went: .went))
   #expect(went.showsWentSwitch && went.filters.went == .went)
   #expect(went.visible == [saved[0]] && went.opening == [saved[0]])
+  #expect(went.chips == [.food])
 
   let want = MapScene(saved: saved, discover: discover, visits: visits, filters: .init(went: .want))
   #expect(want.visible == [saved[1]])

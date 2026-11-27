@@ -46,7 +46,7 @@ public struct MapScene {
     self.filters = effective
     self.visited = visited
     self.visible = visible
-    self.chips = Self.filterKinds(catalog.isEmpty ? entries : matching, selected: effective.kinds)
+    self.chips = Self.filterKinds(matching, selected: effective.kinds)
     self.opening = saved.flatMap { saved in
       if effective.isActive { return visible.isEmpty ? nil : visible }
       return Self.busiestCity(in: saved.isEmpty ? discover : saved)
@@ -54,13 +54,9 @@ public struct MapScene {
   }
 
   private static func filterKinds(_ entries: [MapPlace], selected: Set<PlaceKind>) -> [PlaceKind] {
-    var counts: [PlaceKind: Int] = [:]
-    for place in entries {
-      for kind in Set(place.kinds) { counts[kind, default: 0] += 1 }
-    }
-    return PlaceKind.allCases
-      .filter { $0 != .stay && (counts[$0, default: 0] >= 3 || selected.contains($0)) }
-      .sorted { counts[$0, default: 0] > counts[$1, default: 0] }
+    let order: [PlaceKind] = [.food, .coffee, .activities, .drinks, .dessert, .shopping]
+    let available = Set(entries.flatMap(\.kinds)).union(selected)
+    return order.filter { available.contains($0) }
   }
 
   private static func busiestCity(in anchors: [MapPlace]) -> [MapPlace]? {
