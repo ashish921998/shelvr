@@ -21,8 +21,11 @@ Expo app keeps shipping until the Swift app passes final QA.
 - **One OAuth callback path.** Google sign-in returns to `<scheme>://auth/callback` in both
   variants. Both deployments already allow it, so the path tested in Debug is the one
   production uses.
-- **iOS 18 minimum.** The Apple place card (`MKMapItemDetailViewController`) needs it. The
-  Expo app already targets iOS 18.
+- **iOS 18 minimum for Swift.** The [shared Xcode configuration](../../apps/ios/Config/Shared.xcconfig)
+  sets the deployment target. The public Expo release, 1.0.13, supports iOS 16.4 and later.
+  Devices on iOS 16.4 through 17 stay on the compatible Expo version, and their backend
+  contract remains in use during the rollout.
+  [App Store listing](https://apps.apple.com/us/app/shelvr-date-trip-planner/id6798143550)
 - **No backend changes.** The Swift app calls the same public functions with the same
   argument shapes. A backend change, if one is ever needed, follows the expand and contract
   rule in `CLAUDE.md` and carries the `Convex-Api: changed` trailer.
