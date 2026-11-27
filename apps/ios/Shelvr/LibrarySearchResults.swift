@@ -17,7 +17,7 @@ struct LibrarySearchResults: View {
         if items.isEmpty { Text(copy("search.noResults", ["query": query])) }
         if items.count >= 50 { Text(copy("search.resultLimit")).font(.caption) }
         ForEach(items) { item in
-          if let destination = AppLink("/item/" + item.id) {
+          if let destination = AppLink("/item/" + item.id + "?from=home") {
             NavigationLink(value: destination) {
               VStack(alignment: .leading, spacing: 4) {
                 LibrarySaveRow(save: item, featured: true)

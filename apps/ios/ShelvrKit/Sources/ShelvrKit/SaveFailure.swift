@@ -25,6 +25,14 @@ public enum SaveFailure: Error, Equatable, Sendable {
     }
   }
 
+  public var imageReason: String {
+    switch self {
+    case .photoLimit: "photo_limit"
+    case .photoTooLarge: "too_large"
+    default: "other"
+    }
+  }
+
   public var photoCopyKey: String {
     switch self {
     case .proRequired: "freePlan.photosNeedPro"

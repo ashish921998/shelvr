@@ -3,6 +3,8 @@ import SwiftUI
 
 struct LibraryItemView: View {
   let id: String
+  var from: String?
+  @Environment(\.scenePhase) private var phase
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.dismiss) private var dismiss
@@ -17,6 +19,9 @@ struct LibraryItemView: View {
   @State private var loaded = false
   @State private var failed = false
   @State private var attempt = 0
+  @State private var recorded = false
+
+  private var openable: Bool { save?.status == "ready" && phase == .active }
 
   var body: some View {
     Group {
@@ -38,6 +43,10 @@ struct LibraryItemView: View {
                   Label(copy("item.openSite", ["site": save.siteName ?? host]), systemImage: "arrow.up.right.square")
                     .frame(minHeight: 44)
                 }.foregroundStyle(palette.primaryText)
+                  .environment(\.openURL, OpenURLAction { _ in
+                    Analytics.itemAction(save, "open_source")
+                    return .systemAction
+                  })
               }
             }
             if save.status == "processing" { Label(copy("item.reading"), systemImage: "clock") }
@@ -86,6 +95,9 @@ struct LibraryItemView: View {
       Button(copy("item.deleteEverywhere"), role: .destructive) { Task { await remove() } }
       Button(copy("common.cancel"), role: .cancel) {}
     } message: { Text(copy("item.deleteBody")) }
+    .onAppear(perform: recordOpen)
+    .onDisappear { recorded = false }
+    .onChange(of: openable) { recordOpen() }
     .task(id: "\(id)-\(attempt)") {
       save = nil; loaded = false; failed = false; expandedDetails = false
       do {
@@ -139,11 +151,23 @@ struct LibraryItemView: View {
     catch { message = copy("errors.retryTitle") }
   }
 
+  private func recordOpen() {
+    guard !recorded, openable, let save else { return }
+    recorded = true
+    Analytics.itemOpened(save, source: from)
+  }
+
   private func remove() async {
     guard !busy else { return }
     busy = true
     defer { busy = false }
-    do { try await backend.deleteSave(id); dismiss() }
+    let deleted = save
+    let generation = backend.sessionGeneration
+    do {
+      try await backend.deleteSave(id)
+      if let deleted, generation == backend.sessionGeneration { Analytics.itemDeleted(deleted, surface: "item_detail") }
+      dismiss()
+    }
     catch { message = copy("item.deleteFailed") }
   }
 }

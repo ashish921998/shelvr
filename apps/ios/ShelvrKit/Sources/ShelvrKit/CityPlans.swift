@@ -63,6 +63,12 @@ public struct CityDate: Decodable, Sendable {
   }
 }
 
+public struct TripPlanResult: Decodable, Sendable {
+  public let tripId: String?
+  public let saves: Int
+  public let suggested: Int
+}
+
 public struct CityTrip: Decodable, Sendable {
   public struct Stop: Decodable, Identifiable, Sendable {
     public let _id: String
@@ -74,6 +80,7 @@ public struct CityTrip: Decodable, Sendable {
     public let note: String?
     public let lat: Double
     public let lng: Double
+    public let source: String?
     public var id: String { _id }
   }
 
@@ -92,15 +99,13 @@ extension Backend {
     return try await client.action("datePlans:makeDatePlan", with: args)
   }
 
-  public func planTrip(city: String, days: Int, pace: String, interests: [String], start: String?, stay: String, locale: String, listID: String?) async throws -> String? {
-    struct Result: Decodable { let tripId: String? }
+  public func planTrip(city: String, days: Int, pace: String, interests: [String], start: String?, stay: String, locale: String, listID: String?) async throws -> TripPlanResult {
     var args: [String: ConvexEncodable?] = ["city": city, "days": Double(days), "pace": pace,
       "interests": interests.map { $0 as ConvexEncodable? }, "locale": locale]
     if let start { args["startDate"] = start }
     if !stay.isEmpty { args["stay"] = stay }
     if let listID { args["listId"] = listID }
-    let result: Result = try await client.action("tripPlanner:createTripPlan", with: args)
-    return result.tripId
+    return try await client.action("tripPlanner:createTripPlan", with: args)
   }
 
   public func cityTrip(_ id: String, sharedOnly: Bool = false) -> some AsyncSequence<CityTrip?, any Error> {
