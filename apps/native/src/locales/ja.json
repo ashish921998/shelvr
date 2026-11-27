@@ -221,6 +221,8 @@
   "support.contact": "サポートに問い合わせる",
   "pro.restoring": "購入を復元中…",
   "pro.restore": "購入を復元",
+  "pro.redeemCode": "コードを使う",
+  "pro.redeemFailed": "コードの入力画面を開けませんでした",
   "legal.terms": "利用規約",
   "legal.privacy": "プライバシーポリシー",
   "account.signingOut": "サインアウト中…",

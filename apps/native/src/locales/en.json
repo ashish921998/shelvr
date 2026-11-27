@@ -222,6 +222,8 @@
   "support.contact": "Contact Support",
   "pro.restoring": "Restoring Purchases…",
   "pro.restore": "Restore Purchases",
+  "pro.redeemCode": "Redeem Code",
+  "pro.redeemFailed": "Couldn’t open code redemption",
   "legal.terms": "Terms of Service",
   "legal.privacy": "Privacy Policy",
   "account.signingOut": "Signing out…",

@@ -221,6 +221,8 @@
   "support.contact": "고객 지원 문의",
   "pro.restoring": "구매 복원 중…",
   "pro.restore": "구매 복원",
+  "pro.redeemCode": "코드 사용",
+  "pro.redeemFailed": "코드 입력 화면을 열 수 없습니다",
   "legal.terms": "서비스 이용약관",
   "legal.privacy": "개인정보 처리방침",
   "account.signingOut": "로그아웃 중…",

@@ -94,3 +94,28 @@ export function clearPurchaseBeforeSignIn() {
     write("");
   });
 }
+
+const MERGED_KEY = "shelvr.purchase.merged";
+
+export function noteMergedPurchase(userId: string) {
+  bestEffort("note_merged_purchase_failed", () =>
+    SecureStore.setItem(MERGED_KEY, `${userId}@${Date.now()}`),
+  );
+}
+
+export function hasMergedPurchase(userId: string): boolean {
+  try {
+    const [owner, at] = (SecureStore.getItem(MERGED_KEY) ?? "").split("@");
+    return (
+      owner === userId && Date.now() - Number(at) <= PURCHASE_ATTACH_WINDOW_MS
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function clearMergedPurchase() {
+  bestEffort("clear_merged_purchase_failed", () =>
+    SecureStore.setItem(MERGED_KEY, ""),
+  );
+}

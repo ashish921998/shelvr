@@ -222,6 +222,8 @@
   "support.contact": "Support kontaktieren",
   "pro.restoring": "Käufe werden wiederhergestellt…",
   "pro.restore": "Käufe wiederherstellen",
+  "pro.redeemCode": "Code einlösen",
+  "pro.redeemFailed": "Code-Einlösung konnte nicht geöffnet werden",
   "legal.terms": "Nutzungsbedingungen",
   "legal.privacy": "Datenschutzerklärung",
   "account.signingOut": "Abmelden…",

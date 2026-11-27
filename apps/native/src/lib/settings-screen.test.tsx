@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   restorePurchases: vi.fn(),
+  presentRedeemCodeSheet: vi.fn(),
   deleteAccount: vi.fn(),
   setWeeklyShelf: vi.fn(),
   setSaveReminders: vi.fn(),
@@ -50,6 +51,7 @@ vi.mock("@/lib/current-user", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   openPaywall: mocks.openPaywall,
+  presentRedeemCodeSheet: mocks.presentRedeemCodeSheet,
   restorePurchases: mocks.restorePurchases,
   useEntitlement: () => ({ status: mocks.status }),
 }));
@@ -300,6 +302,43 @@ it.each([
   await act(async () => fireEvent.click(screen.getByText("pro.restore")));
   expect(mocks.restorePurchases).toHaveBeenCalledTimes(1);
   expect(lastAlert().title).toBe(title);
+});
+
+it("counts a redeem sheet as opened only once it is presented", async () => {
+  mocks.presentRedeemCodeSheet.mockResolvedValue(true);
+  render(<SettingsScreen />);
+  await act(async () => fireEvent.click(screen.getByText("pro.redeemCode")));
+
+  expect(mocks.capture).toHaveBeenCalledWith("redeem_code_opened", {});
+  expect(mocks.alert).not.toHaveBeenCalled();
+});
+
+it("ignores a second redeem tap while the sheet is opening", async () => {
+  let open: (opened: boolean) => void = () => {};
+  mocks.presentRedeemCodeSheet.mockReturnValue(
+    new Promise<boolean>((resolve) => (open = resolve)),
+  );
+  render(<SettingsScreen />);
+  fireEvent.click(screen.getByText("pro.redeemCode"));
+  fireEvent.click(screen.getByText("pro.redeemCode"));
+  await act(async () => open(true));
+
+  expect(mocks.presentRedeemCodeSheet).toHaveBeenCalledTimes(1);
+  expect(mocks.captureError).not.toHaveBeenCalled();
+  expect(mocks.alert).not.toHaveBeenCalled();
+});
+
+it("does not count a redeem sheet that never opened", async () => {
+  mocks.presentRedeemCodeSheet.mockResolvedValue(false);
+  render(<SettingsScreen />);
+  await act(async () => fireEvent.click(screen.getByText("pro.redeemCode")));
+
+  expect(mocks.capture).not.toHaveBeenCalledWith("redeem_code_opened", {});
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "redeem_code_failed",
+    expect.any(Error),
+  );
+  expect(lastAlert().title).toBe("pro.redeemFailed");
 });
 
 it("records turning the weekly shelf off as a decision", async () => {

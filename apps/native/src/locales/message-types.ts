@@ -220,6 +220,8 @@ type MessageParams = {
   "support.contact": undefined;
   "pro.restoring": undefined;
   "pro.restore": undefined;
+  "pro.redeemCode": undefined;
+  "pro.redeemFailed": undefined;
   "legal.terms": undefined;
   "legal.privacy": undefined;
   "account.signingOut": undefined;

@@ -16,14 +16,17 @@ import {
 
 type ActiveEntitlementStatus = "trialing" | "pro" | "lifetime";
 
-let pendingAccess: { source: "purchase" | "restore"; at: number } | null = null;
+let pendingAccess: {
+  source: "purchase" | "restore" | "redeem";
+  at: number;
+} | null = null;
 
 let activeEntitlementStatus: ActiveEntitlementStatus | null = null;
 
 let customerInfoReadAt = 0;
 
 function captureEntitlementActivation(
-  source: "purchase" | "restore",
+  source: "purchase" | "restore" | "redeem",
   at: number,
   status: ActiveEntitlementStatus,
 ): void {
@@ -34,7 +37,7 @@ function captureEntitlementActivation(
   });
 }
 
-export function recordAccess(source: "purchase" | "restore"): void {
+export function recordAccess(source: "purchase" | "restore" | "redeem"): void {
   const at = Date.now();
   if (blockedAction !== null) blockedAction.purchased = true;
   if (activeEntitlementStatus !== null) {

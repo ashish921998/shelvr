@@ -26,11 +26,18 @@ const mock = vi.hoisted(() => ({
   },
   auth: { isAuthenticated: true, isLoading: false },
   configure: vi.fn(async (_options: { appUserID?: string }) => {}),
-  logIn: vi.fn(async (_userId: string) => {}),
+  logIn: vi.fn(async (_userId: string) => ({
+    customerInfo: { entitlements: { active: {} as object } },
+    created: false,
+  })),
   logOut: vi.fn(async () => {}),
   isAnonymous: vi.fn(async () => true),
   syncPurchasesForResult: vi.fn(async () => ({})),
   restorePurchases: vi.fn(),
+  presentCodeRedemptionSheet: vi.fn(async () => {}),
+  customerInfoListeners: new Set<
+    (info: { entitlements: { active: object } }) => void
+  >(),
   syncPurchase: vi.fn(async () => true),
   appStateListeners: [] as ((state: string) => void)[],
 }));
@@ -66,6 +73,13 @@ seedRequire("react-native-purchases", {
     isAnonymous: mock.isAnonymous,
     syncPurchasesForResult: mock.syncPurchasesForResult,
     restorePurchases: mock.restorePurchases,
+    presentCodeRedemptionSheet: mock.presentCodeRedemptionSheet,
+    addCustomerInfoUpdateListener: (
+      listener: (info: { entitlements: { active: object } }) => void,
+    ) => mock.customerInfoListeners.add(listener),
+    removeCustomerInfoUpdateListener: (
+      listener: (info: { entitlements: { active: object } }) => void,
+    ) => mock.customerInfoListeners.delete(listener),
     overridePreferredLocale: async () => {},
     getOfferings: mock.getOfferings,
     checkTrialOrIntroductoryPriceEligibility: mock.checkEligibility,
@@ -178,6 +192,8 @@ beforeEach(() => {
   mock.isAnonymous.mockReset().mockResolvedValue(true);
   mock.syncPurchasesForResult.mockReset().mockResolvedValue({});
   mock.syncPurchase.mockReset().mockResolvedValue(true);
+  mock.presentCodeRedemptionSheet.mockReset().mockResolvedValue(undefined);
+  mock.customerInfoListeners.clear();
   mock.appStateListeners = [];
   push.mockClear();
 });
@@ -443,6 +459,83 @@ describe("selling before sign-in", () => {
     expect(mock.syncPurchase).not.toHaveBeenCalled();
   });
 
+  it("reads a purchase the new account took over from before sign-in", async () => {
+    mock.logIn.mockResolvedValueOnce({
+      customerInfo: { entitlements: { active: { pro_under_test: {} } } },
+      created: true,
+    });
+    await loadReady();
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.merged")).toBe(""),
+    );
+    expect(mock.syncPurchase).toHaveBeenCalledOnce();
+    expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
+    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBeUndefined();
+  });
+
+  it("reads a taken-over purchase again on the next launch without syncing the receipt", async () => {
+    mock.logIn.mockResolvedValueOnce({
+      customerInfo: { entitlements: { active: { pro_under_test: {} } } },
+      created: true,
+    });
+    mock.syncPurchase.mockResolvedValue(false);
+    const first = await loadReady();
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalled());
+    first.hook.unmount();
+    expect(mock.store.get("shelvr.purchase.merged")).toMatch(/^user_1@/);
+
+    mock.syncPurchase.mockReset().mockResolvedValue(true);
+    await loadReady();
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.merged")).toBe(""),
+    );
+    expect(mock.syncPurchase).toHaveBeenCalledOnce();
+    expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
+    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBeUndefined();
+  });
+
+  it("makes no backend call when an existing account's Pro is already in Convex", async () => {
+    mock.logIn.mockResolvedValueOnce({
+      customerInfo: { entitlements: { active: { pro_under_test: {} } } },
+      created: false,
+    });
+    mock.useQuery.mockReturnValue({
+      data: { status: "pro", expiresAt: Date.now() + 60 * 60 * 1000 },
+    });
+    mock.isEntitled.mockReturnValue(true);
+    await loadReady();
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+  });
+
+  it("reads Pro into an existing account that Convex still shows as free", async () => {
+    mock.logIn.mockResolvedValueOnce({
+      customerInfo: { entitlements: { active: { pro_under_test: {} } } },
+      created: false,
+    });
+    const { hook } = await loadReady();
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+
+    mock.useQuery.mockReturnValue({ data: { status: "none" } });
+    await act(async () => {
+      hook.rerender();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    await act(async () => {
+      hook.rerender();
+      await Promise.resolve();
+    });
+    expect(mock.syncPurchase).toHaveBeenCalledOnce();
+    expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
+    expect(mock.store.get("shelvr.purchase.merged")).toBeUndefined();
+  });
+
+  it("makes no backend call when an existing account has no Pro in RevenueCat", async () => {
+    mock.useQuery.mockReturnValue({ data: { status: "none" } });
+    await loadReady();
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+  });
+
   it("does not call the backend when nothing was bought before sign-in", async () => {
     await loadReady();
     expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
@@ -680,6 +773,26 @@ describe("paywall activation funnel", () => {
       }),
     );
   });
+  it("reports a redeemed code even when the webhook lands first", async () => {
+    const { presentRedeemCodeSheet, hook } = await loadReady();
+    await presentRedeemCodeSheet();
+    const [listener] = [...mock.customerInfoListeners];
+
+    mock.useQuery.mockReturnValue({
+      data: { status: "pro", expiresAt: Date.now() + 60 * 60 * 1000 },
+    });
+    mock.isEntitled.mockReturnValue(true);
+    await act(async () => {
+      hook.rerender();
+      await Promise.resolve();
+    });
+    act(() => listener!({ entitlements: { active: { pro_under_test: {} } } }));
+
+    expect(mock.capture).toHaveBeenCalledWith(
+      "entitlement_activated",
+      expect.objectContaining({ status: "pro", source: "redeem" }),
+    );
+  });
 });
 
 describe("a blocked action across another paywall", () => {
@@ -757,6 +870,188 @@ describe("a purchase made while signed in", () => {
     await expect(restorePurchases()).resolves.toBe("restored");
 
     await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+  });
+
+  it("reads a redeemed code into the account once RevenueCat reports Pro", async () => {
+    const { presentRedeemCodeSheet } = await loadReady();
+
+    await expect(presentRedeemCodeSheet()).resolves.toBe(true);
+    expect(mock.presentCodeRedemptionSheet).toHaveBeenCalledOnce();
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+
+    const [listener] = [...mock.customerInfoListeners];
+    act(() => listener!({ entitlements: { active: {} } }));
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(1);
+
+    act(() =>
+      listener!({ entitlements: { active: { another_entitlement: {} } } }),
+    );
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+
+    act(() => listener!({ entitlements: { active: { pro_under_test: {} } } }));
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("keeps watching past an existing Pro until the redeemed extension lands", async () => {
+    const current = { latestPurchaseDate: "2026-11-01", expirationDate: "a" };
+    mock.getCustomerInfo.mockResolvedValue({
+      entitlements: { active: { pro_under_test: current } },
+    });
+    const { presentRedeemCodeSheet } = await loadReady();
+    await presentRedeemCodeSheet();
+    const [listener] = [...mock.customerInfoListeners];
+
+    act(() =>
+      listener!({ entitlements: { active: { pro_under_test: current } } }),
+    );
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(1);
+
+    act(() =>
+      listener!({
+        entitlements: {
+          active: { pro_under_test: { ...current, expirationDate: "b" } },
+        },
+      }),
+    );
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("does not open the redeem sheet over a paywall that opened while it read the account", async () => {
+    const { presentRedeemCodeSheet, openPaywall } = await loadReady();
+    let finishRead: (info: unknown) => void = () => {};
+    mock.getCustomerInfo.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRead = resolve;
+      }),
+    );
+    const redeeming = presentRedeemCodeSheet();
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+    mock.presentPaywallIfNeeded.mockReturnValue(new Promise(() => {}));
+    void openPaywall(router, "plan_gate");
+
+    finishRead({ entitlements: { active: {} } });
+
+    await expect(redeeming).resolves.toBe(false);
+    expect(mock.presentCodeRedemptionSheet).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("does not open the redeem sheet after a paywall opened and closed while it read the account", async () => {
+    const { presentRedeemCodeSheet, openPaywall } = await loadReady();
+    let finishRead: (info: unknown) => void = () => {};
+    mock.getCustomerInfo.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRead = resolve;
+      }),
+    );
+    const redeeming = presentRedeemCodeSheet();
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+    mock.presentPaywallIfNeeded.mockResolvedValue("CANCELLED");
+    await openPaywall(router, "plan_gate");
+
+    finishRead({ entitlements: { active: {} } });
+
+    await expect(redeeming).resolves.toBe(false);
+    expect(mock.presentCodeRedemptionSheet).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("stops watching for a redeemed code once a paywall opens", async () => {
+    const { presentRedeemCodeSheet, openPaywall } = await loadReady();
+    await presentRedeemCodeSheet();
+    expect(mock.customerInfoListeners.size).toBe(1);
+
+    mock.presentPaywallIfNeeded.mockResolvedValue("CANCELLED");
+    await openPaywall(router, "plan_gate");
+
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("stops watching for a redeemed code once a restore starts", async () => {
+    const { presentRedeemCodeSheet, restorePurchases } = await loadReady();
+    await presentRedeemCodeSheet();
+    mock.restorePurchases.mockResolvedValue({ entitlements: { active: {} } });
+
+    await restorePurchases();
+
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("does not open the redeem sheet while a restore is running", async () => {
+    const { presentRedeemCodeSheet, restorePurchases } = await loadReady();
+    let finishRestore: (info: unknown) => void = () => {};
+    mock.restorePurchases.mockReturnValue(
+      new Promise((resolve) => {
+        finishRestore = resolve;
+      }),
+    );
+    const restoring = restorePurchases();
+
+    await expect(presentRedeemCodeSheet()).resolves.toBe(false);
+    expect(mock.presentCodeRedemptionSheet).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(0);
+
+    finishRestore({ entitlements: { active: {} } });
+    await restoring;
+    await expect(presentRedeemCodeSheet()).resolves.toBe(true);
+  });
+
+  it("stops watching for a redeemed code once the account changes", async () => {
+    const { presentRedeemCodeSheet, hook } = await loadReady();
+    await presentRedeemCodeSheet();
+    expect(mock.customerInfoListeners.size).toBe(1);
+
+    mock.auth = { isAuthenticated: false, isLoading: false };
+    hook.rerender();
+    mock.auth = { isAuthenticated: true, isLoading: false };
+    hook.rerender();
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("does not open the redeem sheet after a sign-out during its account read", async () => {
+    const { presentRedeemCodeSheet, hook } = await loadReady();
+    let finishRead: (info: unknown) => void = () => {};
+    mock.getCustomerInfo.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRead = resolve;
+      }),
+    );
+    const redeeming = presentRedeemCodeSheet();
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+
+    mock.auth = { isAuthenticated: false, isLoading: false };
+    hook.rerender();
+    finishRead({ entitlements: { active: {} } });
+
+    await expect(redeeming).resolves.toBe(false);
+    expect(mock.presentCodeRedemptionSheet).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("does not open the redeem sheet when it cannot read the account first", async () => {
+    const { presentRedeemCodeSheet } = await loadReady();
+    mock.getCustomerInfo.mockRejectedValueOnce(new Error("offline"));
+
+    await expect(presentRedeemCodeSheet()).rejects.toThrow("offline");
+    expect(mock.presentCodeRedemptionSheet).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("stops watching when the redeem sheet fails to open", async () => {
+    const { presentRedeemCodeSheet } = await loadReady();
+    mock.presentCodeRedemptionSheet.mockRejectedValueOnce(new Error("no"));
+
+    await expect(presentRedeemCodeSheet()).rejects.toThrow("no");
+    expect(mock.customerInfoListeners.size).toBe(0);
   });
 
   it("reads again when the first read finds nothing yet", async () => {

@@ -6,7 +6,11 @@ import { SettingsGroup, SettingsRow } from "@/components/ui/settings-list";
 import { analytics } from "@/lib/analytics";
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { useCurrentUser } from "@/lib/current-user";
-import { openPaywall, useEntitlement } from "@/lib/entitlement";
+import {
+  openPaywall,
+  presentRedeemCodeSheet,
+  useEntitlement,
+} from "@/lib/entitlement";
 import { useAccess } from "@/lib/free-plan";
 import { freeSavesTitle } from "@/lib/free-saves-title";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -26,10 +30,11 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { useNavigation, useRouter } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Alert,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -126,6 +131,27 @@ export default function SettingsScreen() {
       );
       Alert.alert(t("notifications.updateFailed"), t("errors.trySoon"));
     }
+  };
+
+  const redeeming = useRef(false);
+  const redeemCode = async () => {
+    if (redeeming.current) return;
+    redeeming.current = true;
+    try {
+      if (await presentRedeemCodeSheet()) {
+        analytics.capture("redeem_code_opened", {});
+        return;
+      }
+      analytics.captureError(
+        "redeem_code_failed",
+        new Error("revenuecat_not_ready"),
+      );
+    } catch (error) {
+      analytics.captureError("redeem_code_failed", error);
+    } finally {
+      redeeming.current = false;
+    }
+    Alert.alert(t("pro.redeemFailed"), t("errors.trySoon"));
   };
 
   const confirmDeleteAccount = () => {
@@ -304,6 +330,14 @@ export default function SettingsScreen() {
           disabled={restoring}
           onPress={() => void restore()}
         />
+        {Platform.OS === "ios" ? (
+          <SettingsRow
+            testID="settings-redeem-code"
+            label={t("pro.redeemCode")}
+            disabled={restoring}
+            onPress={() => void redeemCode()}
+          />
+        ) : null}
         <SettingsRow
           label={t("support.contact")}
           icon="arrow.up.right"

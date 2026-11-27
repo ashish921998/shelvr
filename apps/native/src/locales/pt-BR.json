@@ -223,6 +223,8 @@
   "support.contact": "Contatar suporte",
   "pro.restoring": "Restaurando compras…",
   "pro.restore": "Restaurar compras",
+  "pro.redeemCode": "Resgatar código",
+  "pro.redeemFailed": "Não foi possível abrir o resgate de código",
   "legal.terms": "Termos de serviço",
   "legal.privacy": "Política de privacidade",
   "account.signingOut": "Saindo…",

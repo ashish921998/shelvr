@@ -223,6 +223,8 @@
   "support.contact": "Contactar con soporte",
   "pro.restoring": "Restaurando compras…",
   "pro.restore": "Restaurar compras",
+  "pro.redeemCode": "Canjear código",
+  "pro.redeemFailed": "No se pudo abrir el canje de códigos",
   "legal.terms": "Condiciones de servicio",
   "legal.privacy": "Política de privacidad",
   "account.signingOut": "Cerrando sesión…",

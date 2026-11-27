@@ -44,8 +44,11 @@ import { AppState } from "react-native";
 import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
 import {
   claimPurchaseBeforeSignIn,
+  clearMergedPurchase,
   clearPurchaseBeforeSignIn,
+  hasMergedPurchase,
   hasPurchaseBeforeSignIn,
+  noteMergedPurchase,
 } from "@/lib/purchase-before-sign-in";
 import {
   notePurchaseLanding,
@@ -75,12 +78,14 @@ let _rcIdentitySync = Promise.resolve();
 let _rcAnonymousReady = false;
 let _rcSignedOut = false;
 let _rcRetryIdentity: (() => void) | null = null;
+let stopRedeemWatch: (() => void) | null = null;
 const ANONYMOUS_PLACEMENT = "onboarding";
 
 const SYNC_READY_TIMEOUT_MS = 5000;
 
 function setRcTargetUserId(userId: string | null) {
   if (_rcTargetUserId === userId) return;
+  stopRedeemWatch?.();
   _rcTargetUserId = userId;
   _rcSyncedUserId = null;
   _rcAnonymousReady = false;
@@ -163,6 +168,19 @@ export function useEntitlementSync(): void {
       entitlement.status === "lifetime")
       ? entitlement.status
       : null;
+  const convexFree = !entitlement.loading && !entitlement.entitled;
+  const [rcProFor, setRcProFor] = useState<string | null>(null);
+  const rcProReadFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (sub === null || rcProFor !== sub || !convexFree) return;
+    if (rcProReadFor.current === sub || isProHiddenForE2E()) return;
+    rcProReadFor.current = sub;
+    syncPurchaseRef
+      .current({})
+      .catch((error: unknown) =>
+        analytics.captureError("purchase_sync_failed", error),
+      );
+  }, [sub, rcProFor, convexFree]);
 
   useEffect(() => {
     setRcTargetUserId(sub);
@@ -194,6 +212,21 @@ export function useEntitlementSync(): void {
           analytics.captureError("purchase_sync_failed", error),
       });
     };
+    let readMerged: ReturnType<typeof startRevenueCatIdentitySync> | null =
+      null;
+    const readMergedPurchase = () => {
+      readMerged = startRevenueCatIdentitySync({
+        sync: async () => {
+          if (!(await syncPurchaseRef.current({})))
+            throw new Error("purchase_not_attached");
+        },
+        onReady: clearMergedPurchase,
+        onError: (error) =>
+          analytics.captureError("purchase_sync_failed", error),
+      });
+    };
+    let mergedPro = false;
+    let existingPro = false;
     const observer = startRevenueCatIdentitySync({
       sync: () => {
         const attempt = _rcIdentitySync.then(async () => {
@@ -202,15 +235,23 @@ export function useEntitlementSync(): void {
           if (cancelled || _rcTargetUserId !== sub) return;
           const rc = getPurchases();
           if (!rc) throw new Error("revenuecat_module_unavailable");
-          await rc.logIn(sub);
+          const { customerInfo, created } = await rc.logIn(sub);
+          const rcPro =
+            REVENUECAT_PRO_ENTITLEMENT in customerInfo.entitlements.active;
+          mergedPro = created && rcPro;
+          existingPro = !created && rcPro;
         });
         _rcIdentitySync = attempt.catch(() => {});
         return attempt;
       },
       onReady: () => {
         markRcUserSynced(sub);
-        if (cancelled || !claimed) return;
-        attachPurchase();
+        if (cancelled) return;
+        if (claimed) attachPurchase();
+        else if (mergedPro || hasMergedPurchase(sub)) {
+          if (mergedPro) noteMergedPurchase(sub);
+          readMergedPurchase();
+        } else if (existingPro) setRcProFor(sub);
       },
       onError: reportRevenueCatIdentityError,
     });
@@ -223,6 +264,7 @@ export function useEntitlementSync(): void {
       if (state !== "active") return;
       observer.retry();
       attach?.retry();
+      readMerged?.retry();
     });
 
     return () => {
@@ -230,8 +272,11 @@ export function useEntitlementSync(): void {
       if (_rcRetryIdentity === retryIdentity) _rcRetryIdentity = null;
       observer.dispose();
       attach?.dispose();
+      readMerged?.dispose();
       stopLanding();
       subscription.remove();
+      rcProReadFor.current = null;
+      setRcProFor(null);
       if (_rcTargetUserId === sub) setRcTargetUserId(null);
     };
   }, [sub, signedOut]);
@@ -440,6 +485,7 @@ type OpenSheet = {
   emptyRestore?: boolean;
 };
 let openSheet: OpenSheet | null = null;
+let purchaseFlowsStarted = 0;
 let lastAppTouchAt = 0;
 
 /** Called by the app root on every touch; one after the native paywall should cover the app shows UIKit refused it. */
@@ -522,6 +568,7 @@ async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
     const outcome = live.paywall ? await live.paywall : "cancelled";
     return { outcome, owned: false, answered: false };
   }
+  stopRedeemWatch?.();
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
   let dropped = false;
   const abandoned = new Promise<PaywallOutcome>((resolve) => {
@@ -531,6 +578,7 @@ async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
     };
   });
   openSheet = sheet;
+  purchaseFlowsStarted += 1;
   const landing = reservePurchaseLanding();
   sheet.paywall = Promise.race([presentPaywallImpl(placement), abandoned])
     .then((outcome) => {
@@ -600,7 +648,20 @@ export async function presentCustomerCenter(): Promise<boolean> {
 
 type RestorePurchasesOutcome = "restored" | "none" | "unavailable";
 
+let restoresRunning = 0;
+
 export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
+  stopRedeemWatch?.();
+  restoresRunning += 1;
+  purchaseFlowsStarted += 1;
+  try {
+    return await runRestore();
+  } finally {
+    restoresRunning -= 1;
+  }
+}
+
+async function runRestore(): Promise<RestorePurchasesOutcome> {
   const landing = reservePurchaseLanding();
   if (!(await awaitRcSyncReady())) return "unavailable";
 
@@ -616,6 +677,59 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
   } catch {
     return "unavailable";
   }
+}
+
+const REDEEM_WATCH_MS = 10 * 60_000;
+
+type ProCustomerInfo = {
+  entitlements: {
+    active: Record<
+      string,
+      { latestPurchaseDate?: string; expirationDate?: string | null }
+    >;
+  };
+};
+
+function proPurchase(info: ProCustomerInfo): string | null {
+  const pro = info.entitlements.active[REVENUECAT_PRO_ENTITLEMENT];
+  return pro ? `${pro.latestPurchaseDate}|${pro.expirationDate}` : null;
+}
+
+export async function presentRedeemCodeSheet(): Promise<boolean> {
+  const landing = reservePurchaseLanding();
+  if (!(await awaitRcSyncReady())) return false;
+  const rc = getPurchases();
+  if (!rc) return false;
+  const account = _rcTargetUserId;
+  const flows = purchaseFlowsStarted;
+  const before = proPurchase(await rc.getCustomerInfo());
+  if (_rcTargetUserId !== account || !isRcSyncReady()) return false;
+  if (purchaseFlowsStarted !== flows || restoresRunning > 0 || liveSheet())
+    return false;
+  stopRedeemWatch?.();
+  const unrecorded = !hasActiveEntitlement();
+  const listener = (info: ProCustomerInfo) => {
+    const after = proPurchase(info);
+    if (after === null || after === before) return;
+    stop();
+    if (unrecorded) recordAccess("redeem");
+    landing();
+  };
+  const timer = setTimeout(() => stop(), REDEEM_WATCH_MS);
+  const stop = () => {
+    clearTimeout(timer);
+    rc.removeCustomerInfoUpdateListener(listener);
+    if (stopRedeemWatch === stop) stopRedeemWatch = null;
+  };
+  stopRedeemWatch = stop;
+  rc.addCustomerInfoUpdateListener(listener);
+  try {
+    await rc.presentCodeRedemptionSheet();
+  } catch (error) {
+    stop();
+    throw error;
+  }
+  return true;
 }
 
 export async function readRcTrialCancellation(): Promise<TrialCancellationState> {
