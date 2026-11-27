@@ -70,6 +70,21 @@ private final class RecordingPhotoMutations: PhotoMutationClient {
   }
 }
 
+@MainActor @Test func aDrainFinishesAnInterruptedClaimBeforePruningTheInbox() async throws {
+  try await withShareInbox { inbox in
+    try inbox.activate(nil)
+    let stage = try inbox.stage(owner: nil)
+    let link = InboxPayload(kind: .link, value: "https://example.com/deferred")
+    try inbox.publish([link], in: stage)
+    try Data("first".utf8).write(to: inbox.directory.appending(path: "owner"))
+
+    let saver = RecordingShareSaver()
+    let processor = ShareInboxProcessor(inbox: inbox, saver: saver)
+    #expect(try await processor.drain(owner: "first") == nil)
+    #expect(saver.sentLinks == [link.value])
+  }
+}
+
 @MainActor @Test func accountSwitchDuringUploadStopsBeforeAttachAndKeepsTheManifest() async throws {
   try await withShareInbox { inbox in
     let stage = try inbox.stage(owner: "first")

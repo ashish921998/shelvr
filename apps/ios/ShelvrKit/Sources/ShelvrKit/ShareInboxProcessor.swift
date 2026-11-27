@@ -80,7 +80,7 @@ public struct ShareInboxProcessor {
       guard saver.userID == owner else { throw ShareInboxError.ownerChanged }
     }
     try checkpoint()
-    if inbox.activeOwner != owner { try updateOwner() }
+    try updateOwner()
     try inbox.prune(keeping: owner)
     let refusal = try await inbox.drain(owner: owner) { delivery in
       try checkpoint()
