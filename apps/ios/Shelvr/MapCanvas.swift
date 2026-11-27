@@ -325,6 +325,7 @@ struct MapCanvas: UIViewControllerRepresentable {
       map.deselectAnnotation(annotation, animated: false)
       if let pin = annotation as? Pin { parent.onPick(pin.place) }
       if let cluster = annotation as? MKClusterAnnotation {
+        parent.onUserMove()
         let places = cluster.memberAnnotations.compactMap { ($0 as? Pin)?.place }
         if map.region.span.longitudeDelta < 0.01 ||
           Set(places.map { MKMapPoint($0.coordinate).x }).count == 1 {
