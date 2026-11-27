@@ -66,9 +66,7 @@ struct ProActionGateView: View {
 
   var body: some View {
     ContentUnavailableView {
-      Label(copy("planGate.title"), systemImage: "sparkles")
-    } description: {
-      Text(copy("planGate.body"))
+      Label(copy("pro.unlockShelvr"), systemImage: "sparkles")
     } actions: {
       Button(copy("planGate.seePlans")) { operation.askToPurchase() }
         .buttonStyle(.borderedProminent)
