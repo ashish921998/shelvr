@@ -75,14 +75,33 @@ export function keptPlaces<
     city?: string;
   },
 >(places: readonly Place[], removed: readonly StagedPin[]): Place[] {
+  const labels = (pin: StagedPin) =>
+    places.filter((place) => place.lat === undefined && labelOf(place, pin));
+  const otherBranches = (place: Place, pin: StagedPin) =>
+    !splitSavedPlace(pin.name).area &&
+    branchOf(place, pin) !== "" &&
+    new Set(
+      labels(pin)
+        .map((label) => branchOf(label, pin))
+        .filter(Boolean),
+    ).size > 1;
   return places.filter(
     (place) =>
       !removed.some(
         (pin) =>
           samePin(place, pin) ||
-          (place.lat === undefined && labelOf(place, pin)),
+          (place.lat === undefined &&
+            labelOf(place, pin) &&
+            !otherBranches(place, pin)),
       ),
   );
+}
+
+function branchOf(entry: { name: string }, removed: RevealPin): string {
+  const { area } = splitSavedPlace(entry.name.toLowerCase());
+  if (!removed.city) return area;
+  if (cityKey(area) === cityKey(removed.city)) return "";
+  return withoutCitySuffix(area, removed.city) ?? area;
 }
 
 function labelOf(

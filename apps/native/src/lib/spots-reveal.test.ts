@@ -182,6 +182,17 @@ describe("keptPlaces", () => {
     ];
     expect(keptPlaces(places, [taco, joes])).toEqual([places[2], places[4]]);
   });
+  it("keeps branch labels a removed pin without an area cannot tell apart", () => {
+    const joes = { name: "Joe's", lat: 40.73, lng: -74.0, city: "New York" };
+    const carmine = { name: "Joe's, Carmine St", city: "New York" };
+    const broadway = { name: "Joe's, Broadway, New York", city: "New York" };
+    const bare = { name: "Joe's", city: "New York" };
+    expect(keptPlaces([joes, carmine, broadway, bare], [joes])).toEqual([
+      carmine,
+      broadway,
+    ]);
+    expect(keptPlaces([joes, carmine, bare], [joes])).toEqual([]);
+  });
   it("keeps a namesake label in another city of a multi-city save", () => {
     const places = [taco, { name: "Taco Bar, Dallas" }];
     expect(keptPlaces(places, [taco])).toEqual([places[1]]);
