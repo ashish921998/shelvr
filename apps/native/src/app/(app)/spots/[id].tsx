@@ -142,6 +142,7 @@ function Spots({
     await removal.fix();
     if ((await editGate.admit()) !== "go") return;
     editGate.passed();
+    removal.leave("fix");
     router.push({
       pathname: "/edit-save-places",
       params: { itemId: save._id },

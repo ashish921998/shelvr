@@ -361,15 +361,16 @@ describe("removing places from one save", () => {
     if (!data) throw new Error("Missing save");
     return { ...ready, data };
   }
-  const without = (places: { name: string }[], name: string) =>
-    places.filter((place) => place.name !== name);
+  const without = (places: { name: string }[], ...names: string[]) =>
+    places.filter((place) => !names.includes(place.name));
+  const label = `${second.name}, Chiado`;
 
   it("lets a free user remove a place and keeps what the save knew about the rest", async () => {
     const { base, t, itemId, data } = await twoPlaces(false);
     await t.mutation(api.placeCorrections.savePlaces, {
       itemId,
       version: data.version,
-      places: without(data.places, second.name),
+      places: without(data.places, second.name, label),
     });
     const item = await base.run((ctx) => ctx.db.get(itemId));
     expect(item).toMatchObject({
@@ -402,11 +403,22 @@ describe("removing places from one save", () => {
     await t.mutation(api.placeCorrections.savePlaces, {
       itemId,
       version: data.version,
-      places: without(data.places, second.name),
+      places: without(data.places, second.name, label),
     });
     await storeCurrentPins(base, { itemId, found: [second] });
     const item = await base.run((ctx) => ctx.db.get(itemId));
     expect(item?.placePins?.map((pin) => pin.name)).toEqual([original.name]);
+  });
+  it("keeps every place the list still names, even one sharing a removed place's venue", async () => {
+    const { base, t, itemId, data } = await twoPlaces(false);
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, second.name),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.places).toEqual([original.name, label]);
+    expect(item?.placePins).toEqual([{ ...original, cuisine: "burger" }]);
   });
   it("keeps places whose names have no letters apart from each other", async () => {
     const { base, t, itemId } = await setup(false);

@@ -170,4 +170,16 @@ describe("keptPlaces", () => {
   it("keeps a namesake at other coordinates", () => {
     expect(keptPlaces(listed, [{ ...taco, lat: 31 }])).toEqual(listed);
   });
+  it("drops an unpinned label for the removed spot, but not another branch", () => {
+    const joes = { name: "Joe's, Carmine St", lat: 40.73, lng: -74.0 };
+    const places = [
+      taco,
+      { name: "taco bar, East Austin" },
+      { name: "Taco Barn" },
+      joes,
+      { name: "Joe's, Broadway" },
+      { name: "Joe's, Carmine St" },
+    ];
+    expect(keptPlaces(places, [taco, joes])).toEqual([places[2], places[4]]);
+  });
 });

@@ -497,6 +497,21 @@ it("retries once against a fresh list, then reports a failed write", async () =>
   );
 });
 
+it("reports a failed write when the fresh list cannot be read", async () => {
+  twoSpots();
+  mocks.savePlaces.mockRejectedValueOnce(new Error("Places changed"));
+  mocks.freshPlaces.mockRejectedValueOnce(new Error("offline"));
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  cleanup();
+  await flush();
+  await flush();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "spots_removal_failed",
+    expect.any(Error),
+  );
+});
+
 it("stays on the reveal when every spot is removed", async () => {
   mocks.save = {
     _id: "item-1",
@@ -560,4 +575,41 @@ it("writes staged removals before a shared list copies the save's places", async
     places: [uchi, bakery],
   });
   expect(screen.queryByText("common.undo")).toBeNull();
+});
+
+it("writes a removal again on leaving when an earlier write failed", async () => {
+  const { AlsoAddTo } = await import("@/components/shared-list/also-add-to");
+  twoSpots();
+  mocks.savePlaces.mockRejectedValueOnce(new Error("offline"));
+  mocks.freshPlaces.mockRejectedValueOnce(new Error("offline"));
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  const props = vi.mocked(AlsoAddTo).mock.lastCall?.[0];
+  await act(() => props?.beforeToggle?.() ?? Promise.resolve());
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "spots_removal_failed",
+    expect.any(Error),
+  );
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(2);
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [uchi, bakery],
+  });
+});
+
+it("logs a back exit, not fix, when the Pro gate keeps the person on the reveal", async () => {
+  twoSpots();
+  mocks.admit.mockResolvedValue("paywalled");
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  await flush();
+  unmount();
+  await flush();
+  expect(
+    mocks.capture.mock.calls.filter(([name]) => name === "share_spots_left"),
+  ).toEqual([["share_spots_left", { pin_count: 2, removed: 0, via: "back" }]]);
 });

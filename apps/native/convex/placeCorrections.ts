@@ -15,7 +15,6 @@ import {
   removalsSince,
   visibleSave,
 } from "./model/placeRemovals";
-import { placeKey, splitSavedPlace } from "./model/plan";
 import { buildSearchText } from "./model/searchText";
 import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
@@ -121,35 +120,23 @@ function onlyRemoves(
   });
 }
 
-function venueOf(label: string): string {
-  const { name } = splitSavedPlace(label);
-  return placeKey(name) || name.toLowerCase();
-}
-
 function removalEdit(
   visible: Doc<"items">,
   chosen: EditablePlace[],
   current: EditablePlace[],
 ) {
-  const pinned = new Set(
-    chosen.flatMap((place) =>
-      place.lat === undefined ? [] : [venueOf(place.name)],
-    ),
-  );
+  const keptNames = new Set(chosen.map((place) => place.name.toLowerCase()));
   const removed = new Set(
     current
       .filter((place) => !chosen.some((kept) => samePlace(kept, place)))
-      .map((place) => venueOf(place.name))
-      .filter((venue) => !pinned.has(venue)),
+      .map((place) => place.name.toLowerCase())
+      .filter((name) => !keptNames.has(name)),
   );
-  const gone = (name: string) => removed.has(venueOf(name));
-  const kept = chosen.filter(
-    (place) => place.lat !== undefined || !gone(place.name),
-  );
+  const gone = (name: string) => removed.has(name.toLowerCase());
   return {
-    kept,
+    kept: chosen,
     placePins: (visible.placePins ?? []).filter((pin) =>
-      kept.some(
+      chosen.some(
         (place) =>
           place.name === pin.name &&
           place.lat === pin.lat &&

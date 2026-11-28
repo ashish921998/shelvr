@@ -86,9 +86,13 @@ When the new list is the current list with places removed (same order, no add, n
   skip the save (`convex/items.ts:2320`). That is the right meaning after a removal.
 - **No new lookups:** it schedules `locateItem` only if unpinned places remain, as today. A
   removal never starts a new search.
-- **Labels go with their venue:** an unpinned label for a removed venue ("Lucy's, Montrose" after
-  removing the pin "Lucy's") is dropped too, unless a kept pin has the same venue. Otherwise
-  `locateItem` would look it up again.
+- **Exactly the list sent:** the server keeps every entry the request names. Edit places sends
+  every row the person kept, so it can't tell a label they chose to keep from one tied to a
+  removed pin.
+- **Labels go with their pin, on the reveal:** the reveal client also leaves out an unpinned label
+  for a removed pin ("Lucy's, Montrose" after removing the pin "Lucy's"), or `locateItem` would
+  look it up again. It matches the name, and the area when the pin has one, so removing
+  "Joe's, Carmine St" keeps "Joe's, Broadway".
 
 **Free users may remove, not add.** Saving is free under `FREE_SAVES_ENABLED`, but every correction
 needs Pro today (`requireProEntitlement` at `convex/placeCorrections.ts:121`). A free user who sees

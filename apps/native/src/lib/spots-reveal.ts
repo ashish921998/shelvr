@@ -1,4 +1,4 @@
-import { isStreetAddress } from "@convex/model/plan";
+import { isStreetAddress, splitSavedPlace } from "@convex/model/plan";
 import { cityKey } from "@convex/model/trip";
 
 export const REVEAL_MAX_WAIT_MS = 25_000;
@@ -62,7 +62,20 @@ export function samePin(
 export function keptPlaces<
   Place extends { name: string; lat?: number; lng?: number; appleId?: string },
 >(places: readonly Place[], removed: readonly RevealPin[]): Place[] {
-  return places.filter((place) => !removed.some((pin) => samePin(place, pin)));
+  return places.filter(
+    (place) =>
+      !removed.some(
+        (pin) =>
+          samePin(place, pin) ||
+          (place.lat === undefined && labelOf(place.name, pin.name)),
+      ),
+  );
+}
+
+function labelOf(label: string, pinName: string): boolean {
+  const place = splitSavedPlace(label.toLowerCase());
+  const pin = splitSavedPlace(pinName.toLowerCase());
+  return place.name === pin.name && (!pin.area || pin.area === place.area);
 }
 
 export function revealFor(

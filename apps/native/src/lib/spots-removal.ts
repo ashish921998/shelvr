@@ -29,7 +29,6 @@ export function useSpotsRemoval(
     latest.current = { listed, staged, revealed, count: found.length };
   });
   const written = useRef(0);
-  const exit = useRef<SpotsExit>("back");
   const left = useRef(false);
 
   useEffect(() => {
@@ -39,17 +38,18 @@ export function useSpotsRemoval(
   }, [undo]);
 
   const write = async () => {
-    const pending = latest.current.staged.slice(written.current);
+    const from = written.current;
+    const pending = latest.current.staged.slice(from);
     if (pending.length === 0) return;
     written.current = latest.current.staged.length;
     setUndo(null);
     let failure: unknown = null;
     for (const fresh of [false, true]) {
-      const data = fresh
-        ? await convex.query(api.placeCorrections.getPlaces, { itemId })
-        : latest.current.listed;
-      if (!data) continue;
       try {
+        const data = fresh
+          ? await convex.query(api.placeCorrections.getPlaces, { itemId })
+          : latest.current.listed;
+        if (!data) continue;
         await savePlaces({
           itemId,
           version: data.version,
@@ -60,24 +60,26 @@ export function useSpotsRemoval(
         failure = error;
       }
     }
+    written.current = Math.min(written.current, from);
     analytics.captureError("spots_removal_failed", failure);
   };
 
   const leave = (via: SpotsExit) => {
-    if (left.current || !latest.current.revealed) return;
-    left.current = true;
-    analytics.capture("share_spots_left", {
-      pin_count: latest.current.count,
-      removed: latest.current.staged.length,
-      via,
-    });
+    if (!left.current && latest.current.revealed) {
+      left.current = true;
+      analytics.capture("share_spots_left", {
+        pin_count: latest.current.count,
+        removed: latest.current.staged.length,
+        via,
+      });
+    }
     void write();
   };
   const onUnmount = useRef(leave);
   useEffect(() => {
     onUnmount.current = leave;
   });
-  useEffect(() => () => onUnmount.current(exit.current), []);
+  useEffect(() => () => onUnmount.current("back"), []);
 
   return {
     shown: found.filter((pin) => !staged.some((gone) => samePin(pin, gone))),
@@ -102,7 +104,6 @@ export function useSpotsRemoval(
         pin_count: found.length,
         staged_removals: staged.length - written.current,
       });
-      exit.current = "fix";
       await write();
     },
     flush: write,
