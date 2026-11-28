@@ -129,7 +129,7 @@ function mapsNames(intents: Doc<"items">["intents"]): string[] {
     .map((intent) => intent.value.trim());
 }
 
-async function placesFromAnySource(
+export async function placesFromAnySource(
   ctx: QueryCtx,
   item: Doc<"items">,
 ): Promise<string[]> {

@@ -18,6 +18,7 @@ import {
   visibleSave,
 } from "./model/placeRemovals";
 import { buildSearchText } from "./model/searchText";
+import { placesFromAnySource } from "./placePins";
 import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 
@@ -131,6 +132,7 @@ function removalEdit(
   chosen: EditablePlace[],
   current: EditablePlace[],
   kept: Set<number>,
+  sources: string[],
 ) {
   const keyOf = (name: string, city: string | undefined) => {
     const bare = (city && withoutCitySuffix(name, city)) || name;
@@ -145,8 +147,16 @@ function removalEdit(
   const shownPins = visible.placePins ?? [];
   const removedPins = shownPins.filter((_, index) => !kept.has(index));
   const shownIntents = visible.intents ?? [];
+  const pending = sources.filter(
+    (name, index) =>
+      !current.some((place) => names(place, name)) &&
+      sources.findIndex(
+        (other) => keyOf(other, undefined) === keyOf(name, undefined),
+      ) === index,
+  );
   return {
     kept: chosen,
+    pending,
     placePins: (item.placePins ?? []).filter(
       (pin) => !removedPins.includes(pin),
     ),
@@ -189,7 +199,14 @@ export const savePlaces = authedMutation({
     const requested = args.places.map(cleanPlace);
     const kept = keptPositions(requested, current);
     const removeOnly = kept
-      ? removalEdit(item, visible, requested, current, kept)
+      ? removalEdit(
+          item,
+          visible,
+          requested,
+          current,
+          kept,
+          item.placesEdited ? [] : await placesFromAnySource(ctx, visible),
+        )
       : null;
     if (!removeOnly) await requireProEntitlement(ctx, ctx.userId);
     await rateLimiter.limit(ctx, "tripEdit", { key: ctx.userId, throws: true });
@@ -203,7 +220,10 @@ export const savePlaces = authedMutation({
         pin.city ? [pin.city] : [],
       ),
     ]);
-    const hiddenLabels = removeOnly?.hiddenLabels ?? [];
+    const hiddenLabels = [
+      ...(removeOnly?.hiddenLabels ?? []),
+      ...(removeOnly?.pending ?? []),
+    ];
     const places = [
       ...new Set([...chosen.map((place) => place.name), ...hiddenLabels]),
     ];

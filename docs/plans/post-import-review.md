@@ -88,7 +88,11 @@ When the new list is the current list with places removed (same order, no add, n
   removal never starts a new search.
 - **Exactly the list sent:** the server keeps every entry the request names. Edit places sends
   every row the person kept, so it can't tell a label they chose to keep from one tied to a
-  removed pin.
+  removed pin. It removes only the rows the request left out, matched by position, from the
+  stored save, so places hidden across the account keep their pins, labels and map links.
+- **Places still being found:** before a save's first edit, map links on the save or its spaces can
+  name a place not yet pinned. The removal adds those names to `places`, unless one names a row
+  the save already lists, so `placesEdited` doesn't stop their pins from landing.
 - **Labels go with their pin, on the reveal:** the reveal client also leaves out an unpinned label
   for a removed pin ("Lucy's, Montrose" after removing the pin "Lucy's"), or `locateItem` would
   look it up again. It matches the name, and the area when the pin has one, so removing

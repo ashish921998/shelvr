@@ -413,6 +413,35 @@ describe("removing places from one save", () => {
     const item = await base.run((ctx) => ctx.db.get(itemId));
     expect(item?.placePins?.map((pin) => pin.name)).toEqual([original.name]);
   });
+  it("keeps a place a map link still waits to find, but not the removed one", async () => {
+    const { base, t, userId, itemId, data } = await twoPlaces(false);
+    const luso = { name: "Cafe Luso", city: "Lisbon", lat: 38.71, lng: -9.14 };
+    await base.run(async (ctx) => {
+      const spaceId = await ctx.db.insert("spaces", { userId, name: "Lisbon" });
+      await ctx.db.insert("spaceItems", {
+        userId,
+        spaceId,
+        itemId,
+        status: "saved",
+        intents: [
+          { kind: "open_maps", label: "Luso", value: luso.name },
+          { kind: "open_maps", label: "Bakery", value: second.name },
+        ],
+      });
+    });
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, second.name, label),
+    });
+    await storeCurrentPins(base, { itemId, found: [second, luso] });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.places).toEqual([original.name, luso.name]);
+    expect(item?.placePins?.map((pin) => pin.name)).toEqual([
+      original.name,
+      luso.name,
+    ]);
+  });
   it("keeps every place the list still names, even one sharing a removed place's venue", async () => {
     const { base, t, itemId, data } = await twoPlaces(false);
     await t.mutation(api.placeCorrections.savePlaces, {
