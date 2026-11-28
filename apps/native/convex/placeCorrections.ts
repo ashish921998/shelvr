@@ -17,6 +17,7 @@ import {
   removalsSince,
   visibleSave,
 } from "./model/placeRemovals";
+import { splitSavedPlace } from "./model/plan";
 import { buildSearchText } from "./model/searchText";
 import { placesFromAnySource } from "./placePins";
 import { requireProEntitlement } from "./subscriptions";
@@ -140,16 +141,29 @@ function removalEdit(
   };
   const names = (place: EditablePlace, name: string) =>
     keyOf(name, place.city) === keyOf(place.name, place.city);
+  const elsewhere = (place: EditablePlace, name: string) =>
+    (visible.cities ?? []).some(
+      (city) =>
+        city.toLowerCase() !== place.city?.toLowerCase() &&
+        withoutCitySuffix(name, city) !== null,
+    );
+  const venue = (place: EditablePlace, name: string) =>
+    !elsewhere(place, name) &&
+    keyOf(splitSavedPlace(name).name, place.city) ===
+      keyOf(splitSavedPlace(place.name).name, place.city);
   const removed = current.filter((_, index) => !kept.has(index));
   const gone = (name: string) =>
-    removed.some((place) => names(place, name)) &&
-    !chosen.some((kept) => names(kept, name));
+    (removed.some((place) => names(place, name)) &&
+      !chosen.some((kept) => names(kept, name))) ||
+    (removed.some((place) => venue(place, name)) &&
+      !chosen.some((kept) => venue(kept, name)));
   const shownPins = visible.placePins ?? [];
   const removedPins = shownPins.filter((_, index) => !kept.has(index));
   const shownIntents = visible.intents ?? [];
   const pending = sources.filter(
     (name, index) =>
       !current.some((place) => names(place, name)) &&
+      !gone(name) &&
       sources.findIndex(
         (other) => keyOf(other, undefined) === keyOf(name, undefined),
       ) === index,
@@ -173,6 +187,28 @@ function removalEdit(
         !shownIntents.includes(intent) ||
         !gone(intent.value),
     ),
+  };
+}
+
+function editedScope(
+  item: Doc<"items">,
+  chosen: EditablePlace[],
+  removal: ReturnType<typeof removalEdit> | null,
+) {
+  const waiting = (removal?.pending.length ?? 0) > 0;
+  const cities = normalizeCities([
+    ...chosen.flatMap((place) =>
+      place.city ? [place.city] : (item.cities ?? []),
+    ),
+    ...(removal?.hiddenPins ?? []).flatMap((pin) =>
+      pin.city ? [pin.city] : [],
+    ),
+    ...(waiting ? (item.cities ?? []) : []),
+  ]);
+  return {
+    cities,
+    lookAgain:
+      waiting && JSON.stringify(cities) !== JSON.stringify(item.cities ?? []),
   };
 }
 
@@ -212,14 +248,7 @@ export const savePlaces = authedMutation({
     await rateLimiter.limit(ctx, "tripEdit", { key: ctx.userId, throws: true });
     const chosen = removeOnly?.kept ?? requested;
     if (samePlaces(chosen, current)) return null;
-    const cities = normalizeCities([
-      ...chosen.flatMap((place) =>
-        place.city ? [place.city] : (item.cities ?? []),
-      ),
-      ...(removeOnly?.hiddenPins ?? []).flatMap((pin) =>
-        pin.city ? [pin.city] : [],
-      ),
-    ]);
+    const { cities, lookAgain } = editedScope(item, chosen, removeOnly);
     const hiddenLabels = [
       ...(removeOnly?.hiddenLabels ?? []),
       ...(removeOnly?.pending ?? []),
@@ -258,7 +287,7 @@ export const savePlaces = authedMutation({
       for (const removal of removalsSince(removals, item._creationTime))
         if (placePins.some((pin) => isRemovedSuggestion([removal], pin)))
           await ctx.db.delete(removal._id);
-    if (unpinned.length > 0)
+    if (unpinned.length > 0 || lookAgain)
       await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
         itemId: item._id,
       });

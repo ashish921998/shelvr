@@ -478,6 +478,92 @@ describe("removing places from one save", () => {
       luso.name,
     ]);
   });
+  it("does not bring back a removed place through a map link naming its area", async () => {
+    const { base, t, itemId, data } = await twoPlaces(false);
+    const branch = {
+      kind: "open_maps" as const,
+      label: "Rato",
+      value: `${second.name}, Rato`,
+    };
+    await base.run(async (ctx) => {
+      const item = await ctx.db.get(itemId);
+      await ctx.db.patch(itemId, {
+        intents: [...(item?.intents ?? []), branch],
+      });
+    });
+    const fresh = await t.query(api.placeCorrections.getPlaces, { itemId });
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: fresh?.version ?? data.version,
+      places: without(data.places, second.name, label),
+    });
+    await storeCurrentPins(base, {
+      itemId,
+      found: [{ ...second, name: branch.value }],
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.places).toEqual([original.name]);
+    expect(item?.intents).not.toContainEqual(branch);
+    expect(item?.placePins?.map((pin) => pin.name)).toEqual([original.name]);
+  });
+  const luso = { name: "Cafe Luso", city: "Lisbon", lat: 38.71, lng: -9.14 };
+  async function waitingOnLuso(pro: boolean) {
+    const ready = await setup(pro);
+    await ready.base.run(async (ctx) => {
+      const spaceId = await ctx.db.insert("spaces", {
+        userId: ready.userId,
+        name: "Lisbon",
+      });
+      await ctx.db.insert("spaceItems", {
+        userId: ready.userId,
+        spaceId,
+        itemId: ready.itemId,
+        status: "saved",
+        intents: [{ kind: "open_maps", label: "Luso", value: luso.name }],
+      });
+    });
+    return ready;
+  }
+  it("lets a lookup already running pin a place a map link still waits on", async () => {
+    const { base, t, itemId } = await waitingOnLuso(false);
+    const running = await base.query(internal.placePins.toLocate, { itemId });
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!running || !data) throw new Error("Missing save");
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: [],
+    });
+    await base.mutation(internal.placePins.storePins, {
+      itemId,
+      version: running.version,
+      found: [luso],
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({ places: [luso.name], cities: ["Lisbon"] });
+    expect(item?.placePins?.map((pin) => pin.name)).toEqual([luso.name]);
+  });
+  it("looks again for a place a map link waits on when the removal moves the save's cities", async () => {
+    const { base, t, itemId } = await waitingOnLuso(false);
+    const ribeira = { name: "Ribeira", city: "Porto", lat: 41.14, lng: -8.61 };
+    await base.run((ctx) =>
+      ctx.db.patch(itemId, {
+        places: [original.name, ribeira.name],
+        placePins: [original, ribeira],
+      }),
+    );
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, original.name),
+    });
+    const jobs = await base.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(jobs.map((job) => job.name)).toContain("placePins:locateItem");
+  });
   it("keeps every place the list still names, even one sharing a removed place's venue", async () => {
     const { base, t, itemId, data } = await twoPlaces(false);
     await t.mutation(api.placeCorrections.savePlaces, {

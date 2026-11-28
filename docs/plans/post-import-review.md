@@ -92,7 +92,11 @@ When the new list is the current list with places removed (same order, no add, n
   stored save, so places hidden across the account keep their pins, labels and map links.
 - **Places still being found:** before a save's first edit, map links on the save or its spaces can
   name a place not yet pinned. The removal adds those names to `places`, unless one names a row
-  the save already lists, so `placesEdited` doesn't stop their pins from landing.
+  the save already lists, so `placesEdited` doesn't stop their pins from landing. A link that names
+  a removed place's venue ("Lucy's, Montrose" after removing "Lucy's") is dropped with it, unless a
+  kept place shares that venue or the link ends in another of the save's cities. While such names
+  wait, the save keeps its cities, so a lookup already running can still store their pins; if the
+  cities change anyway, the removal starts a new lookup.
 - **Labels go with their pin, on the reveal:** the reveal client also leaves out an unpinned label
   for a removed pin ("Lucy's, Montrose" after removing the pin "Lucy's"), or `locateItem` would
   look it up again. It matches the name, and the area when the pin has one, so removing
