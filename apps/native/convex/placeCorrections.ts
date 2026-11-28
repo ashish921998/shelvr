@@ -208,7 +208,7 @@ function editedScope(
       place.city ? [place.city] : (item.cities ?? []),
     ),
     ...(removal?.hiddenPins ?? []).flatMap((pin) =>
-      pin.city ? [pin.city] : [],
+      pin.city ? [pin.city] : (item.cities ?? []),
     ),
     ...(waiting ? (item.cities ?? []) : []),
   ]);
