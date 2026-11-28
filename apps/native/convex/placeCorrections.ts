@@ -10,6 +10,7 @@ import {
   normalizeCities,
   normalizePlaceLocations,
   savedPlaceKey,
+  withoutCitySuffix,
 } from "./model/itemFields";
 import {
   isRemovedSuggestion,
@@ -126,16 +127,18 @@ function removalEdit(
   chosen: EditablePlace[],
   current: EditablePlace[],
 ) {
-  const keyOf = (name: string) =>
-    savedPlaceKey(name, visible.cities) || name.toLowerCase();
-  const keptKeys = new Set(chosen.map((place) => keyOf(place.name)));
-  const removed = new Set(
-    current
-      .filter((place) => !chosen.some((kept) => samePlace(kept, place)))
-      .map((place) => keyOf(place.name))
-      .filter((key) => !keptKeys.has(key)),
+  const keyOf = (name: string, city: string | undefined) => {
+    const bare = (city && withoutCitySuffix(name, city)) || name;
+    return savedPlaceKey(bare, visible.cities) || bare.toLowerCase();
+  };
+  const names = (place: EditablePlace, name: string) =>
+    keyOf(name, place.city) === keyOf(place.name, place.city);
+  const removed = current.filter(
+    (place) =>
+      !chosen.some((kept) => samePlace(kept, place)) &&
+      !chosen.some((kept) => names(place, kept.name)),
   );
-  const gone = (name: string) => removed.has(keyOf(name));
+  const gone = (name: string) => removed.some((place) => names(place, name));
   return {
     kept: chosen,
     placePins: (visible.placePins ?? []).filter((pin) =>

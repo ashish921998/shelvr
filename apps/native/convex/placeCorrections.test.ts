@@ -448,6 +448,37 @@ describe("removing places from one save", () => {
     expect(item?.places).toEqual(["☕"]);
     expect(item?.placeCuisines).toEqual([{ name: "☕", cuisine: "coffee" }]);
   });
+  it("drops a map link that names the removed place's city in a multi-city save", async () => {
+    const { base, t, itemId } = await setup(false);
+    const tigre = {
+      name: "Tigre, Alfama",
+      city: "Lisbon",
+      lat: 38.71,
+      lng: -9.13,
+    };
+    await base.run((ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Lisbon", "Porto"],
+        places: [original.name, tigre.name],
+        placePins: [original, tigre],
+        intents: [
+          { kind: "open_maps", label: "Tigre", value: "Tigre, Alfama, Lisbon" },
+          { kind: "open_maps", label: "Tigre", value: "Tigre, Alfama, Porto" },
+        ],
+      }),
+    );
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, tigre.name),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.intents).toEqual([
+      { kind: "open_maps", label: "Tigre", value: "Tigre, Alfama, Porto" },
+    ]);
+  });
   it("still needs Pro to add, replace or reorder", async () => {
     const { t, itemId, data } = await twoPlaces(false);
     for (const places of [

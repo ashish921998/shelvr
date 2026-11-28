@@ -9,7 +9,10 @@ const mocks = vi.hoisted(() => ({ toggle: vi.fn() }));
 
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("@/lib/shared-lists", () => ({
-  alsoAddLists: () => [{ _id: "list-1", name: "Date night", members: [] }],
+  alsoAddLists: () => [
+    { _id: "list-1", name: "Date night", members: [] },
+    { _id: "list-2", name: "Brunch", members: [] },
+  ],
   partnerName: () => "",
   useAlsoAddTo: () => ({ state: {}, toggle: mocks.toggle }),
   useSharedLists: () => ({ data: [] }),
@@ -103,4 +106,29 @@ it("does not copy the save's places when its removals could not be written", asy
   expect(mocks.toggle).not.toHaveBeenCalled();
   await act(async () => fireEvent.click(row()));
   expect(mocks.toggle).not.toHaveBeenCalled();
+});
+
+it("still toggles another list tapped while the first one's flush runs", async () => {
+  let finish = (_: boolean) => {};
+  const beforeToggle = vi
+    .fn()
+    .mockReturnValueOnce(new Promise<boolean>((resolve) => (finish = resolve)))
+    .mockResolvedValue(true);
+  render(
+    <AlsoAddTo
+      itemId={ITEM}
+      city="Austin"
+      count={2}
+      beforeToggle={beforeToggle}
+    />,
+  );
+  fireEvent.click(row());
+  await act(async () =>
+    fireEvent.click(screen.getByLabelText("Brunch, just you")),
+  );
+  await act(async () => finish(true));
+  expect(mocks.toggle.mock.calls.map(([list]) => list._id).sort()).toEqual([
+    "list-1",
+    "list-2",
+  ]);
 });

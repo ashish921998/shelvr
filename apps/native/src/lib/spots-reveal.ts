@@ -1,3 +1,4 @@
+import { withoutCitySuffix } from "@convex/model/itemFields";
 import { isStreetAddress, splitSavedPlace } from "@convex/model/plan";
 import { cityKey } from "@convex/model/trip";
 
@@ -85,11 +86,15 @@ function labelOf(
   const place = splitSavedPlace(entry.name.toLowerCase());
   const pin = splitSavedPlace(removed.name.toLowerCase());
   if (place.name !== pin.name) return false;
-  if (pin.area) return pin.area === place.area;
   const inPinCity = (city: string | undefined) =>
     city !== undefined &&
     (!removed.city || cityKey(city) === cityKey(removed.city));
-  return inPinCity(entry.city) || (!!removed.city && inPinCity(place.area));
+  const area = removed.city && withoutCitySuffix(place.area, removed.city);
+  if (pin.area) return pin.area === (area || place.area);
+  return (
+    inPinCity(entry.city) ||
+    (!!removed.city && (!!area || inPinCity(place.area)))
+  );
 }
 
 export function revealFor(

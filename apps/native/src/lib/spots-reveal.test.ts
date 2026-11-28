@@ -186,6 +186,22 @@ describe("keptPlaces", () => {
     const places = [taco, { name: "Taco Bar, Dallas" }];
     expect(keptPlaces(places, [taco])).toEqual([places[1]]);
   });
+  it("reads a label's trailing city apart from its area", () => {
+    const branch = {
+      name: "Tigre, Alfama",
+      lat: 38.71,
+      lng: -9.13,
+      city: "Lisbon",
+    };
+    const bare = { name: "Tigre", lat: 38.72, lng: -9.14, city: "Lisbon" };
+    const places = [
+      { name: "Tigre, Alfama, Lisbon" },
+      { name: "Tigre, Alfama, Porto" },
+      { name: "Tigre, Baixa" },
+    ];
+    expect(keptPlaces(places, [branch])).toEqual([places[1], places[2]]);
+    expect(keptPlaces(places, [bare])).toEqual([places[1], places[2]]);
+  });
   it("drops a label naming the removed spot's city in a multi-city save", () => {
     const places = [taco, { name: "Taco Bar, Austin" }, { name: "Taco Bar" }];
     expect(keptPlaces(places, [taco])).toEqual([places[2]]);

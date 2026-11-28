@@ -32,7 +32,7 @@ export function AlsoAddTo({
   const reduced = useLiveReducedMotion();
   const lists = alsoAddLists(useSharedLists().data);
   const { state, toggle } = useAlsoAddTo(itemId, city);
-  const pending = useRef(false);
+  const pending = useRef(new Set<string>());
   if (lists.length === 0) return null;
   return (
     <View style={styles.section}>
@@ -58,13 +58,13 @@ export function AlsoAddTo({
             accessibilityState={{ checked: on, busy, disabled: busy }}
             disabled={busy}
             onPress={async () => {
-              if (pending.current) return;
-              pending.current = true;
+              if (pending.current.has(list._id)) return;
+              pending.current.add(list._id);
               try {
                 if ((await beforeToggle?.()) === false) return;
                 await toggle(list);
               } finally {
-                pending.current = false;
+                pending.current.delete(list._id);
               }
             }}
             style={({ pressed }) => [
