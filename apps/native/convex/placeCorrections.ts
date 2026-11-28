@@ -203,6 +203,7 @@ function editedScope(
   removal: ReturnType<typeof removalEdit> | null,
 ) {
   const waiting = (removal?.pending.length ?? 0) > 0;
+  const labelled = waiting || (removal?.hiddenLabels.length ?? 0) > 0;
   const cities = normalizeCities([
     ...chosen.flatMap((place) =>
       place.city ? [place.city] : (item.cities ?? []),
@@ -210,7 +211,7 @@ function editedScope(
     ...(removal?.hiddenPins ?? []).flatMap((pin) =>
       pin.city ? [pin.city] : (item.cities ?? []),
     ),
-    ...(waiting ? (item.cities ?? []) : []),
+    ...(labelled ? (item.cities ?? []) : []),
   ]);
   return {
     cities,

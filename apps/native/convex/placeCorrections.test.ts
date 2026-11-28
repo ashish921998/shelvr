@@ -757,6 +757,27 @@ describe("removing places from one save", () => {
     );
     expect(rows).toHaveLength(1);
   });
+  it("keeps a hidden label hidden when the last shown place is removed", async () => {
+    const { base, t, userId, itemId } = await setup(false);
+    await base.run(async (ctx) => {
+      await ctx.db.patch(itemId, {
+        places: [original.name, second.name],
+        placePins: [second],
+      });
+      await ctx.db.insert("placeRemovals", { userId, ...original });
+    });
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, second.name),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({ cities: ["Lisbon"], places: [original.name] });
+    const after = await t.query(api.placeCorrections.getPlaces, { itemId });
+    expect(after?.places).toEqual([]);
+  });
   it("keeps the save's city when the only place left is a hidden pin with no city", async () => {
     const { base, t, userId, itemId } = await setup(false);
     const { city: _city, ...cityless } = original;
