@@ -302,7 +302,7 @@ describe("the cuisines a run brings", () => {
     expect(patch.placeCuisines).toBeUndefined();
   });
 
-  it("drops them once the person has edited the places", () => {
+  it("keeps the save's own once the person has edited the places", () => {
     const patch = completionPatch(
       savedItem({
         places: ["Antiga"],
@@ -313,8 +313,7 @@ describe("the cuisines a run brings", () => {
       true,
     );
     expect(patch.places).toEqual(["Antiga"]);
-    expect("placeCuisines" in patch).toBe(true);
-    expect(patch.placeCuisines).toBeUndefined();
+    expect(patch.placeCuisines).toEqual(old);
   });
 
   it("writes none when the run brings no places", () => {

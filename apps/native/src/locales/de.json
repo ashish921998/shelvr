@@ -1058,6 +1058,9 @@
     "other": "%{formattedCount} Orte aus diesem Inhalt"
   },
   "spots.openCity": "%{city} öffnen",
+  "spots.removePlace": "„%{name}“ aus diesem Inhalt entfernen",
+  "spots.noneLeft": "Keine Orte mehr in diesem Inhalt",
+  "spots.fixPlaces": "Ort falsch oder fehlt einer?",
   "placeCategory.restaurant": "Restaurant",
   "placeCategory.foodMarket": "Lebensmittelmarkt",
   "placeCategory.cafe": "Café",

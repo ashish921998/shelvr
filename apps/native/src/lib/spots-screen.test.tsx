@@ -34,6 +34,14 @@ const mocks = vi.hoisted(() => ({
   impact: vi.fn(),
   dropped: undefined as number | undefined,
   success: vi.fn(),
+  listed: undefined as
+    | { places: { name: string }[]; version: string; ready: boolean }
+    | undefined,
+  savePlaces: vi.fn(),
+  freshPlaces: vi.fn(),
+  admit: vi.fn(),
+  passed: vi.fn(),
+  captureError: vi.fn(),
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -42,7 +50,54 @@ vi.mock("@/lib/i18n", () => ({
   useAppLocale: () => {},
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: mocks.capture, captureError: vi.fn() },
+  analytics: { capture: mocks.capture, captureError: mocks.captureError },
+}));
+vi.mock("convex/react", () => ({
+  useQuery: () => mocks.listed,
+  useMutation: () => mocks.savePlaces,
+  useConvex: () => ({
+    query: () => Promise.resolve(mocks.listed ?? mocks.freshPlaces()),
+    watchQuery: () => {
+      let read = () => mocks.listed;
+      return {
+        localQueryResult: () => read(),
+        onUpdate: (update: () => void) => {
+          let live = true;
+          Promise.resolve()
+            .then(() => mocks.freshPlaces())
+            .then(
+              (data) => {
+                read = () => data;
+              },
+              (error) => {
+                read = () => {
+                  throw error;
+                };
+              },
+            )
+            .then(() => live && update());
+          return () => {
+            live = false;
+          };
+        },
+      };
+    },
+  }),
+}));
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({ admit: mocks.admit, passed: mocks.passed }),
+}));
+vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
+vi.mock("@/components/ui/undo-bar", () => ({
+  UndoBar: vi.fn(
+    ({ message, onUndo }: { message: string | null; onUndo: () => void }) =>
+      message ? (
+        <div>
+          {message}
+          <button onClick={onUndo}>common.undo</button>
+        </div>
+      ) : null,
+  ),
 }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.save, isError: false }),
@@ -63,11 +118,17 @@ const fakes = vi.hoisted(() => ({
     children,
     title,
     onPress,
+    accessibilityLabel,
   }: {
     children?: ReactNode;
     title?: string;
     onPress: () => void;
-  }) => <button onClick={onPress}>{title ?? children}</button>,
+    accessibilityLabel?: string;
+  }) => (
+    <button aria-label={accessibilityLabel} onClick={onPress}>
+      {title ?? children}
+    </button>
+  ),
 }));
 
 vi.mock("@/components/shared-list/also-add-to", () => ({
@@ -109,7 +170,7 @@ vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => new Proxy({}, { get: () => ({}) }) },
   useUnistyles: () => ({
     rt: { screen: { height: 800 }, insets: { top: 0, bottom: 0 } },
-    theme: { gap: (n: number) => n * 8 },
+    theme: { gap: (n: number) => n * 8, colors: { muted: "gray" } },
   }),
 }));
 vi.mock("react-native", () => ({
@@ -132,6 +193,12 @@ beforeEach(() => {
   mocks.save = undefined;
   mocks.impact.mockReset();
   mocks.success.mockReset();
+  mocks.listed = undefined;
+  mocks.savePlaces.mockReset().mockResolvedValue(null);
+  mocks.freshPlaces.mockReset();
+  mocks.admit.mockReset().mockResolvedValue("go");
+  mocks.passed.mockReset();
+  mocks.captureError.mockReset();
   vi.stubEnv("EXPO_OS", "ios");
 });
 
@@ -347,4 +414,660 @@ it("adds spots the save gains after the reveal", () => {
   expect(screen.getByText("Odd Duck")).toBeTruthy();
   expect(screen.getByText("label Restaurant")).toBeTruthy();
   expect(mocks.capture).toHaveBeenCalledTimes(1);
+});
+
+const uchi = { name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" };
+const duck = { name: "Odd Duck", lat: 30.25, lng: -97.76, city: "Austin" };
+const bakery = { name: "Bakery", city: "Austin" };
+const removeLabel = (name: string) =>
+  `spots.removePlace ${JSON.stringify({ name })}`;
+function twoSpots() {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [uchi, duck],
+  };
+  mocks.listed = { places: [uchi, duck, bakery], version: "v1", ready: true };
+}
+const flush = () => act(() => Promise.resolve());
+
+it("removes a spot with undo and writes the kept places once on Done", async () => {
+  twoSpots();
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  expect(screen.queryByText("Odd Duck")).toBeNull();
+  expect(screen.getByText('spots.count {"count":1}')).toBeTruthy();
+  fireEvent.click(screen.getByText("common.undo"));
+  expect(screen.getByText("Odd Duck")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  expect(mocks.savePlaces).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("common.done"));
+  await flush();
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledOnce();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [uchi, bakery],
+  });
+  expect(mocks.admit).not.toHaveBeenCalled();
+  expect(
+    mocks.capture.mock.calls.filter(([name]) => name === "share_spots_left"),
+  ).toEqual([["share_spots_left", { pin_count: 2, removed: 1, via: "done" }]]);
+});
+
+it("writes staged removals when the person goes back", async () => {
+  twoSpots();
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [duck, bakery],
+  });
+  expect(mocks.capture).toHaveBeenCalledWith("share_spots_left", {
+    pin_count: 2,
+    removed: 1,
+    via: "back",
+  });
+});
+
+it("writes nothing when no spot was removed", async () => {
+  twoSpots();
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByText("common.done"));
+  await flush();
+  expect(mocks.savePlaces).not.toHaveBeenCalled();
+});
+
+it("hides remove until every pin has dropped", () => {
+  twoSpots();
+  mocks.dropped = 1;
+  render(<SpotsScreen />);
+  expect(screen.queryByLabelText(removeLabel("Uchi"))).toBeNull();
+  expect(screen.queryByText("spots.fixPlaces")).toBeNull();
+});
+
+it("retries once against a fresh list, then reports a failed write", async () => {
+  twoSpots();
+  mocks.savePlaces.mockRejectedValueOnce(new Error("Places changed"));
+  mocks.freshPlaces.mockResolvedValue({
+    places: [uchi, duck],
+    version: "v2",
+    ready: true,
+  });
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  unmount();
+  await flush();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [uchi],
+  });
+  expect(mocks.captureError).not.toHaveBeenCalled();
+  mocks.savePlaces.mockRejectedValue(new Error("Places changed"));
+  twoSpots();
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  cleanup();
+  await flush();
+  await flush();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "spots_removal_failed",
+    expect.any(Error),
+  );
+});
+
+it("writes again once a save that was being reprocessed is ready with the same places", async () => {
+  twoSpots();
+  mocks.listed = { ...mocks.listed!, ready: false };
+  mocks.savePlaces.mockRejectedValueOnce(new Error("Places changed"));
+  mocks.freshPlaces.mockResolvedValue({ ...mocks.listed, ready: true });
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  cleanup();
+  await flush();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(2);
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [uchi, bakery],
+  });
+  expect(mocks.captureError).not.toHaveBeenCalled();
+});
+
+it("sends the same ready list once more when nothing newer arrives, then reports", async () => {
+  vi.useFakeTimers();
+  twoSpots();
+  mocks.savePlaces.mockRejectedValue(new Error("Places changed"));
+  mocks.freshPlaces.mockImplementation(() => mocks.listed);
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  cleanup();
+  await act(() => vi.advanceTimersByTimeAsync(2900));
+  expect(mocks.savePlaces).toHaveBeenCalledOnce();
+  expect(mocks.captureError).not.toHaveBeenCalled();
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(2);
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith(
+    expect.objectContaining({ version: "v1" }),
+  );
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "spots_removal_failed",
+    expect.any(Error),
+  );
+});
+
+it("saves when a write rejected mid-reprocessing is retried after the save is ready again", async () => {
+  vi.useFakeTimers();
+  twoSpots();
+  mocks.savePlaces.mockRejectedValueOnce(new Error("Places changed"));
+  mocks.freshPlaces.mockImplementation(() => mocks.listed);
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  cleanup();
+  await act(() => vi.advanceTimersByTimeAsync(3100));
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(2);
+  expect(mocks.captureError).not.toHaveBeenCalled();
+});
+
+it("reports a failed write when the fresh list cannot be read", async () => {
+  twoSpots();
+  mocks.savePlaces.mockRejectedValueOnce(new Error("Places changed"));
+  mocks.freshPlaces.mockRejectedValueOnce(new Error("offline"));
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  cleanup();
+  await flush();
+  await flush();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "spots_removal_failed",
+    expect.any(Error),
+  );
+});
+
+it("stays on the reveal when every spot is removed", async () => {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [uchi],
+  };
+  mocks.listed = { places: [uchi], version: "v1", ready: true };
+  const { rerender } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  expect(screen.getByText("spots.noneLeft")).toBeTruthy();
+  expect(screen.queryByText('spots.openCity {"city":"Austin"}')).toBeNull();
+  mocks.save = { ...mocks.save, cities: [], placePins: [] };
+  rerender(<SpotsScreen />);
+  expect(screen.getByText("spots.noneLeft")).toBeTruthy();
+  expect(mocks.replace).not.toHaveBeenCalled();
+});
+
+it("writes removals before Edit places and opens it through the Pro gate", async () => {
+  twoSpots();
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  await flush();
+  expect(mocks.capture).toHaveBeenCalledWith("share_spots_fix_opened", {
+    pin_count: 2,
+    staged_removals: 1,
+  });
+  expect(mocks.savePlaces).toHaveBeenCalledOnce();
+  expect(mocks.savePlaces.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.admit.mock.invocationCallOrder[0],
+  );
+  expect(mocks.push).toHaveBeenCalledWith({
+    pathname: "/edit-save-places",
+    params: { itemId: "item-1" },
+  });
+});
+
+it("does not open Edit places over Done once its write finishes", async () => {
+  twoSpots();
+  let finish = () => {};
+  mocks.savePlaces.mockReturnValueOnce(
+    new Promise<null>((resolve) => (finish = () => resolve(null))),
+  );
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  fireEvent.click(screen.getByText("common.done"));
+  await act(async () => finish());
+  await flush();
+  expect(mocks.replace).toHaveBeenCalledOnce();
+  expect(mocks.admit).not.toHaveBeenCalled();
+  expect(mocks.push).not.toHaveBeenCalled();
+  expect(
+    mocks.capture.mock.calls.filter(
+      ([name]) => name === "share_spots_fix_opened",
+    ),
+  ).toHaveLength(1);
+});
+
+it("opens Edit places once for a double tap, and again on a later tap", async () => {
+  twoSpots();
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  await flush();
+  expect(mocks.push).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  await flush();
+  expect(mocks.push).toHaveBeenCalledTimes(2);
+});
+
+it("stays on the reveal when the Pro gate does not let Edit places open", async () => {
+  twoSpots();
+  mocks.admit.mockResolvedValue("paywalled");
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  await flush();
+  expect(mocks.savePlaces).not.toHaveBeenCalled();
+  expect(mocks.push).not.toHaveBeenCalled();
+});
+
+it("writes staged removals before a shared list copies the save's places", async () => {
+  const { AlsoAddTo } = await import("@/components/shared-list/also-add-to");
+  twoSpots();
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  const props = vi.mocked(AlsoAddTo).mock.lastCall?.[0];
+  let flushed: boolean | undefined;
+  await act(async () => {
+    flushed = await props?.beforeToggle?.();
+  });
+  expect(flushed).toBe(true);
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [uchi, bakery],
+  });
+  expect(screen.queryByText("common.undo")).toBeNull();
+});
+
+it("writes a removal again on leaving when an earlier write failed", async () => {
+  const { AlsoAddTo } = await import("@/components/shared-list/also-add-to");
+  twoSpots();
+  mocks.savePlaces.mockRejectedValueOnce(new Error("offline"));
+  mocks.freshPlaces.mockRejectedValueOnce(new Error("offline"));
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  const props = vi.mocked(AlsoAddTo).mock.lastCall?.[0];
+  let flushed: boolean | undefined;
+  await act(async () => {
+    flushed = await props?.beforeToggle?.();
+  });
+  expect(flushed).toBe(false);
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "spots_removal_failed",
+    expect.any(Error),
+  );
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(2);
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [uchi, bakery],
+  });
+});
+
+it("logs a back exit, not fix, when the Pro gate keeps the person on the reveal", async () => {
+  twoSpots();
+  mocks.admit.mockResolvedValue("paywalled");
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  await flush();
+  unmount();
+  await flush();
+  expect(
+    mocks.capture.mock.calls.filter(([name]) => name === "share_spots_left"),
+  ).toEqual([["share_spots_left", { pin_count: 2, removed: 0, via: "back" }]]);
+});
+
+it("makes a shared-list tick wait for a removal write already in flight", async () => {
+  const { AlsoAddTo } = await import("@/components/shared-list/also-add-to");
+  twoSpots();
+  let finish = () => {};
+  mocks.savePlaces.mockReturnValueOnce(
+    new Promise<null>((resolve) => (finish = () => resolve(null))),
+  );
+  mocks.admit.mockResolvedValue("paywalled");
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledOnce();
+  const props = vi.mocked(AlsoAddTo).mock.lastCall?.[0];
+  let flushed: boolean | undefined;
+  const tick = props?.beforeToggle?.().then((ok) => (flushed = ok));
+  await flush();
+  expect(flushed).toBeUndefined();
+  await act(async () => {
+    finish();
+    await tick;
+  });
+  expect(flushed).toBe(true);
+  expect(mocks.savePlaces).toHaveBeenCalledOnce();
+});
+
+it("keeps a list tick waiting until a spot removed during its write is saved too", async () => {
+  const { AlsoAddTo } = await import("@/components/shared-list/also-add-to");
+  twoSpots();
+  let finish = () => {};
+  mocks.savePlaces
+    .mockReturnValueOnce(
+      new Promise<null>((resolve) => (finish = () => resolve(null))),
+    )
+    .mockRejectedValueOnce(new Error("Places changed"));
+  mocks.freshPlaces.mockResolvedValue({
+    places: [uchi, bakery],
+    version: "v2",
+    ready: true,
+  });
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  const props = vi.mocked(AlsoAddTo).mock.lastCall?.[0];
+  let flushed: boolean | undefined;
+  const tick = props?.beforeToggle?.().then((ok) => (flushed = ok));
+  await flush();
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  await act(async () => {
+    finish();
+    await tick;
+  });
+  expect(flushed).toBe(true);
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(3);
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [bakery],
+  });
+  expect(mocks.captureError).not.toHaveBeenCalled();
+});
+
+it("shows a spot again when Edit places adds back one the reveal removed", async () => {
+  twoSpots();
+  const { rerender } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  await flush();
+  expect(mocks.push).toHaveBeenCalled();
+  mocks.save = { ...mocks.save!, placePins: [uchi] };
+  rerender(<SpotsScreen />);
+  mocks.save = { ...mocks.save, placePins: [uchi, duck] };
+  rerender(<SpotsScreen />);
+  expect(screen.getByText("Odd Duck")).toBeTruthy();
+  expect(screen.getByText('spots.count {"count":2}')).toBeTruthy();
+});
+
+it("removes every pin a merged reveal row stands for", async () => {
+  const twin = { ...uchi, lat: 30.2601 };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [uchi, twin, duck],
+  };
+  mocks.listed = { places: [uchi, twin, duck], version: "v1", ready: true };
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  expect(screen.queryByText("Uchi")).toBeNull();
+  fireEvent.click(screen.getByText("common.undo"));
+  expect(screen.getByText("Uchi")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [duck],
+  });
+});
+
+it("removes a pin that joins the row only through another pin's Apple id", async () => {
+  const alpha = { ...uchi, name: "Alpha", appleId: "venue-1" };
+  const beta = { ...uchi, name: "Beta", appleId: "venue-1" };
+  const bare = { ...uchi, name: "Beta", lat: uchi.lat + 0.001 };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [alpha, beta, bare, duck],
+  };
+  mocks.listed = {
+    places: [alpha, beta, bare, duck],
+    version: "v1",
+    ready: true,
+  };
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Alpha")));
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [duck],
+  });
+});
+
+it("keeps the venue whose row a removed neighbour of the same name did not join", async () => {
+  const bare = { ...uchi };
+  const first = { ...uchi, appleId: "venue-a" };
+  const second = { ...uchi, appleId: "venue-b", lat: uchi.lat + 0.001 };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [bare, first, second, duck],
+  };
+  mocks.listed = {
+    places: [bare, first, second, duck],
+    version: "v1",
+    ready: true,
+  };
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getAllByLabelText(removeLabel("Uchi"))[1]);
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [bare, first, duck],
+  });
+});
+
+it("keeps another venue at the same name and point as a removed pin with no Apple id", async () => {
+  const bare = { ...uchi };
+  const first = { ...uchi, appleId: "venue-a" };
+  const second = { ...uchi, appleId: "venue-b" };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [bare, first, second, duck],
+  };
+  mocks.listed = {
+    places: [bare, first, second, duck],
+    version: "v1",
+    ready: true,
+  };
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getAllByLabelText(removeLabel("Uchi"))[0]);
+  expect(screen.getAllByText("Uchi")).toHaveLength(1);
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [second, duck],
+  });
+});
+
+it("keeps a removed pin removed after its Apple id lands", async () => {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [uchi, duck],
+  };
+  mocks.listed = { places: [uchi, duck], version: "v1", ready: true };
+  const { rerender, unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  const identified = { ...uchi, appleId: "venue-a" };
+  mocks.save = { ...mocks.save, placePins: [identified, duck] };
+  mocks.listed = { places: [identified, duck], version: "v2", ready: true };
+  rerender(<SpotsScreen />);
+  expect(screen.queryByText("Uchi")).toBeNull();
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [duck],
+  });
+});
+
+it("keeps a removed pin removed after a lookup moves it slightly", async () => {
+  twoSpots();
+  const { rerender, unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  const refined = { ...uchi, lat: uchi.lat + 0.00001 };
+  mocks.save = { ...mocks.save!, placePins: [refined, duck] };
+  mocks.listed = {
+    places: [refined, duck, bakery],
+    version: "v2",
+    ready: true,
+  };
+  rerender(<SpotsScreen />);
+  expect(screen.queryByText("Uchi")).toBeNull();
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [duck, bakery],
+  });
+});
+
+it("keeps a removal when the retry finds the pin moved after the screen closed", async () => {
+  twoSpots();
+  mocks.savePlaces.mockRejectedValueOnce(new Error("Places changed"));
+  const refined = { ...uchi, lat: uchi.lat + 0.00001 };
+  mocks.freshPlaces.mockResolvedValue({
+    places: [refined, duck, bakery],
+    version: "v2",
+    ready: true,
+  });
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  cleanup();
+  await flush();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [duck, bakery],
+  });
+});
+
+it("never moves a removal onto a namesake the reveal did not show", async () => {
+  const cityless = { name: "Uchi", lat: uchi.lat + 0.0005, lng: uchi.lng };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin", "Dallas"],
+    placePins: [uchi, duck, cityless],
+  };
+  mocks.listed = { places: [uchi, duck, cityless], version: "v1", ready: true };
+  const { rerender, unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  mocks.save = { ...mocks.save, placePins: [duck, cityless] };
+  mocks.listed = { places: [duck, cityless], version: "v2", ready: true };
+  rerender(<SpotsScreen />);
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [duck, cityless],
+  });
+});
+
+it("never moves a removal onto a hidden namesake when ✕ is tapped before the list loads", async () => {
+  const cityless = { name: "Uchi", lat: uchi.lat + 0.0005, lng: uchi.lng };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin", "Dallas"],
+    placePins: [uchi, duck, cityless],
+  };
+  const { rerender, unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  mocks.save = { ...mocks.save, placePins: [duck, cityless] };
+  mocks.listed = { places: [duck, cityless], version: "v2", ready: true };
+  rerender(<SpotsScreen />);
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [duck, cityless],
+  });
+});
+
+it("follows the save to another city after Edit places moves its places", () => {
+  twoSpots();
+  const { rerender } = render(<SpotsScreen />);
+  mocks.save = {
+    ...mocks.save!,
+    cities: ["Dallas"],
+    placePins: [
+      { name: "Pecan Lodge", lat: 32.78, lng: -96.8, city: "Dallas" },
+    ],
+  };
+  rerender(<SpotsScreen />);
+  expect(screen.getByText("Pecan Lodge")).toBeTruthy();
+  expect(screen.queryByText("spots.noneLeft")).toBeNull();
+});
+
+it("undoes only the pins its own removal took from a chain of merged rows", async () => {
+  const a = { name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" };
+  const b = { ...a, lat: 30.2622 };
+  const c = { ...a, lat: 30.2644 };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [a, b, c, duck],
+  };
+  mocks.listed = { places: [a, b, c, duck], version: "v1", ready: true };
+  const { unmount } = render(<SpotsScreen />);
+  const [first, second] = screen.getAllByLabelText(removeLabel("Uchi"));
+  fireEvent.click(first);
+  fireEvent.click(second);
+  fireEvent.click(screen.getByText("common.undo"));
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [c, duck],
+  });
 });

@@ -1030,6 +1030,9 @@
     "other": "이 저장에서 장소 %{formattedCount}곳"
   },
   "spots.openCity": "%{city} 열기",
+  "spots.removePlace": "이 저장에서 %{name} 삭제",
+  "spots.noneLeft": "이 저장에 남은 장소가 없어요",
+  "spots.fixPlaces": "장소가 틀리거나 빠졌나요?",
   "placeCategory.restaurant": "레스토랑",
   "placeCategory.foodMarket": "식료품점",
   "placeCategory.cafe": "카페",

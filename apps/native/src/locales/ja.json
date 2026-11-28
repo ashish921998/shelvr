@@ -1030,6 +1030,9 @@
     "other": "この保存から%{formattedCount}件のスポット"
   },
   "spots.openCity": "%{city}を開く",
+  "spots.removePlace": "この保存から%{name}を削除",
+  "spots.noneLeft": "この保存に残っている場所はありません",
+  "spots.fixPlaces": "場所が違う・足りない場合",
   "placeCategory.restaurant": "レストラン",
   "placeCategory.foodMarket": "食料品店",
   "placeCategory.cafe": "カフェ",

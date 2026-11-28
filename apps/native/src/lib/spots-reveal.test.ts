@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  followMovedPins,
+  keptPlaces,
   REVEAL_MAX_WAIT_MS,
   REVEAL_PIN_GRACE_MS,
   revealFor,
@@ -148,5 +150,104 @@ describe("revealFor", () => {
       kind: "none",
       reason: "no_place",
     });
+  });
+});
+
+describe("keptPlaces", () => {
+  const taco = { name: "Taco Bar", lat: 30.27, lng: -97.74, city: "Austin" };
+  const cafe = { name: "Cafe", lat: 30.28, lng: -97.75, appleId: "apple-1" };
+  const listed = [
+    { ...taco, category: "restaurant" },
+    { ...cafe, city: "Austin", name: "Cafe (renamed by Apple)" },
+    { name: "Bakery", city: "Austin" },
+  ];
+
+  it("drops only the removed spots and leaves every other entry untouched, in order", () => {
+    expect(keptPlaces(listed, [taco])).toEqual([listed[1], listed[2]]);
+  });
+  it("matches by Apple id when both sides have one", () => {
+    expect(keptPlaces(listed, [cafe])).toEqual([listed[0], listed[2]]);
+  });
+  it("keeps a namesake at other coordinates", () => {
+    expect(keptPlaces(listed, [{ ...taco, lat: 31 }])).toEqual(listed);
+  });
+  it("drops an unpinned label for the removed spot, but not another branch", () => {
+    const joes = { name: "Joe's, Carmine St", lat: 40.73, lng: -74.0 };
+    const places = [
+      taco,
+      { name: "taco bar, East Austin", city: "Austin" },
+      { name: "Taco Barn" },
+      joes,
+      { name: "Joe's, Broadway" },
+      { name: "Joe's, Carmine St" },
+    ];
+    expect(keptPlaces(places, [taco, joes])).toEqual([places[2], places[4]]);
+  });
+  it("keeps branch labels a removed pin without an area cannot tell apart", () => {
+    const joes = { name: "Joe's", lat: 40.73, lng: -74.0, city: "New York" };
+    const carmine = { name: "Joe's, Carmine St", city: "New York" };
+    const broadway = { name: "Joe's, Broadway, New York", city: "New York" };
+    const bare = { name: "Joe's", city: "New York" };
+    expect(keptPlaces([joes, carmine, broadway, bare], [joes])).toEqual([
+      carmine,
+      broadway,
+    ]);
+    expect(keptPlaces([joes, carmine, bare], [joes])).toEqual([]);
+  });
+  it("keeps a namesake label in another city of a multi-city save", () => {
+    const places = [taco, { name: "Taco Bar, Dallas" }];
+    expect(keptPlaces(places, [taco])).toEqual([places[1]]);
+  });
+  it("reads a label's trailing city apart from its area", () => {
+    const branch = {
+      name: "Tigre, Alfama",
+      lat: 38.71,
+      lng: -9.13,
+      city: "Lisbon",
+    };
+    const bare = { name: "Tigre", lat: 38.72, lng: -9.14, city: "Lisbon" };
+    const places = [
+      { name: "Tigre, Alfama, Lisbon" },
+      { name: "Tigre, Alfama, Porto" },
+      { name: "Tigre, Baixa" },
+    ];
+    expect(keptPlaces(places, [branch])).toEqual([places[1], places[2]]);
+    expect(keptPlaces(places, [bare])).toEqual([places[1], places[2]]);
+  });
+  it("drops a label naming the removed spot's city in a multi-city save", () => {
+    const places = [taco, { name: "Taco Bar, Austin" }, { name: "Taco Bar" }];
+    expect(keptPlaces(places, [taco])).toEqual([places[2]]);
+  });
+});
+
+describe("followMovedPins", () => {
+  const uchi = { name: "Uchi", lat: 30.26, lng: -97.75 };
+  it("moves a staged pin onto its refreshed point, but never onto a pin it did not become", () => {
+    const moved = { ...uchi, lat: 30.26001 };
+    const existing = { ...uchi, lat: 30.2601 };
+    const otherVenue = { ...uchi, lat: 30.2602, appleId: "venue-b" };
+    const staged = { ...uchi, otherVenues: ["venue-b"] };
+    followMovedPins([staged], [existing, otherVenue], [existing]);
+    expect(staged).toMatchObject({ lat: 30.26 });
+    followMovedPins([staged], [existing, moved], [existing]);
+    expect(staged).toMatchObject({ lat: 30.26001 });
+  });
+  it("never moves a staged pin onto a same-name venue in another city", () => {
+    const staged = { ...uchi, city: "Austin" };
+    const nextDoor = { ...uchi, lat: 30.26001, city: "Round Rock" };
+    followMovedPins([staged], [nextDoor], []);
+    expect(staged).toMatchObject({ lat: 30.26 });
+  });
+  it("never moves a staged pin onto a known namesake that gains an Apple id", () => {
+    const namesake = { ...uchi, lat: 30.2605 };
+    const staged = { ...uchi, namesakes: [namesake] };
+    followMovedPins([staged], [{ ...namesake, appleId: "venue-c" }], []);
+    expect(staged).toMatchObject({ lat: 30.26 });
+  });
+  it("never moves a staged pin onto a known venue whose own pin moved", () => {
+    const venue = { ...uchi, lat: 30.263, appleId: "venue-b" };
+    const staged = { ...uchi };
+    followMovedPins([staged], [{ ...venue, lat: 30.262 }], [venue]);
+    expect(staged).toMatchObject({ lat: 30.26 });
   });
 });

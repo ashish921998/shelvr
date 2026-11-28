@@ -11,6 +11,7 @@ type SwiftStatus = "sent" | { missing: string };
 const SHARE_RESULT = "Swift shares with ShareLink, which reports no result";
 const PASSPORT = "Passport views wait for PR 913";
 const RETIRED = "Expo no longer sends it";
+const SPOT_REVIEW = "The Swift reveal has no place removal yet";
 
 const SWIFT: Record<keyof AnalyticsEventProperties, SwiftStatus> = {
   onboarding_step_viewed: "sent",
@@ -54,6 +55,10 @@ const SWIFT: Record<keyof AnalyticsEventProperties, SwiftStatus> = {
   share_spots_revealed: "sent",
   share_spots_skipped: "sent",
   share_spots_city_opened: "sent",
+  share_spots_place_removed: { missing: SPOT_REVIEW },
+  share_spots_place_restored: { missing: SPOT_REVIEW },
+  share_spots_fix_opened: { missing: SPOT_REVIEW },
+  share_spots_left: { missing: SPOT_REVIEW },
   widget_cleared: "sent",
   widget_sync_failed: "sent",
   map_opened: "sent",

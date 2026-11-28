@@ -1086,6 +1086,9 @@
     "other": "%{formattedCount} adresses de cet enregistrement"
   },
   "spots.openCity": "Ouvrir %{city}",
+  "spots.removePlace": "Retirer %{name} de cet enregistrement",
+  "spots.noneLeft": "Plus aucune adresse dans cet enregistrement",
+  "spots.fixPlaces": "Une adresse erronée ou manquante?",
   "placeCategory.restaurant": "Restaurant",
   "placeCategory.foodMarket": "Marché",
   "placeCategory.cafe": "Café",
