@@ -1,5 +1,6 @@
 import { analytics } from "@/lib/analytics";
 import {
+  followMovedPins,
   keptPlaces,
   type RevealPin,
   samePin,
@@ -68,6 +69,11 @@ export function useSpotsRemoval(
         ? [other.appleId]
         : [],
     );
+  const seen = useRef(found);
+  useEffect(() => {
+    seen.current = found;
+  });
+  followMovedPins(staged, found, seen.current);
   const shown = found.filter(
     (pin) => !staged.some((gone) => samePin(pin, gone)),
   );

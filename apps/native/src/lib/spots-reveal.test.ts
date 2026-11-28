@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  followMovedPins,
   keptPlaces,
   REVEAL_MAX_WAIT_MS,
   REVEAL_PIN_GRACE_MS,
@@ -216,5 +217,19 @@ describe("keptPlaces", () => {
   it("drops a label naming the removed spot's city in a multi-city save", () => {
     const places = [taco, { name: "Taco Bar, Austin" }, { name: "Taco Bar" }];
     expect(keptPlaces(places, [taco])).toEqual([places[2]]);
+  });
+});
+
+describe("followMovedPins", () => {
+  const uchi = { name: "Uchi", lat: 30.26, lng: -97.75 };
+  it("moves a staged pin onto its refreshed point, but never onto a pin it did not become", () => {
+    const moved = { ...uchi, lat: 30.26001 };
+    const existing = { ...uchi, lat: 30.2601 };
+    const otherVenue = { ...uchi, lat: 30.2602, appleId: "venue-b" };
+    const staged = { ...uchi, otherVenues: ["venue-b"] };
+    followMovedPins([staged], [existing, otherVenue], [existing]);
+    expect(staged).toMatchObject({ lat: 30.26 });
+    followMovedPins([staged], [existing, moved], [existing]);
+    expect(staged).toMatchObject({ lat: 30.26001 });
   });
 });

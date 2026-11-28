@@ -944,6 +944,28 @@ it("keeps a removed pin removed after its Apple id lands", async () => {
   });
 });
 
+it("keeps a removed pin removed after a lookup moves it slightly", async () => {
+  twoSpots();
+  const { rerender, unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  const refined = { ...uchi, lat: uchi.lat + 0.00001 };
+  mocks.save = { ...mocks.save!, placePins: [refined, duck] };
+  mocks.listed = {
+    places: [refined, duck, bakery],
+    version: "v2",
+    ready: true,
+  };
+  rerender(<SpotsScreen />);
+  expect(screen.queryByText("Uchi")).toBeNull();
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [duck, bakery],
+  });
+});
+
 it("follows the save to another city after Edit places moves its places", () => {
   twoSpots();
   const { rerender } = render(<SpotsScreen />);

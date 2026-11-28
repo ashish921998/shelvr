@@ -1,6 +1,6 @@
 import { withoutCitySuffix } from "@convex/model/itemFields";
 import { isStreetAddress, splitSavedPlace } from "@convex/model/plan";
-import { cityKey } from "@convex/model/trip";
+import { cityKey, distanceKm, SAME_PLACE_KM } from "@convex/model/trip";
 
 export const REVEAL_MAX_WAIT_MS = 25_000;
 export const REVEAL_PIN_GRACE_MS = 10_000;
@@ -64,6 +64,26 @@ export function samePin(
     pin.lng === removed.lng &&
     !(pin.appleId && removed.otherVenues?.includes(pin.appleId))
   );
+}
+
+export function followMovedPins(
+  staged: readonly StagedPin[],
+  found: readonly RevealPin[],
+  before: readonly RevealPin[],
+): void {
+  const at = (a: RevealPin, b: RevealPin) =>
+    a.name === b.name && a.lat === b.lat && a.lng === b.lng;
+  for (const pin of staged) {
+    if (pin.appleId || found.some((other) => samePin(other, pin))) continue;
+    const moved = found.find(
+      (other) =>
+        other.name === pin.name &&
+        !before.some((old) => at(old, other)) &&
+        !(other.appleId && pin.otherVenues?.includes(other.appleId)) &&
+        distanceKm(other, pin) <= SAME_PLACE_KM,
+    );
+    if (moved) Object.assign(pin, { lat: moved.lat, lng: moved.lng });
+  }
 }
 
 export function keptPlaces<
