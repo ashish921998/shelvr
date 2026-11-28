@@ -232,4 +232,10 @@ describe("followMovedPins", () => {
     followMovedPins([staged], [existing, moved], [existing]);
     expect(staged).toMatchObject({ lat: 30.26001 });
   });
+  it("never moves a staged pin onto a known venue whose own pin moved", () => {
+    const venue = { ...uchi, lat: 30.263, appleId: "venue-b" };
+    const staged = { ...uchi };
+    followMovedPins([staged], [{ ...venue, lat: 30.262 }], [venue]);
+    expect(staged).toMatchObject({ lat: 30.26 });
+  });
 });

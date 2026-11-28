@@ -2,6 +2,7 @@ import { analytics } from "@/lib/analytics";
 import {
   followMovedPins,
   keptPlaces,
+  pinnedOnly,
   type RevealPin,
   samePin,
   type StagedPin,
@@ -121,6 +122,7 @@ export function useSpotsRemoval(
     setUndo(null);
     let failure: unknown = null;
     let rejected: { version: string; ready: boolean } | null = null;
+    let before: readonly RevealPin[] = seen.current;
     for (const fresh of [false, true]) {
       try {
         const data: typeof listed | null = fresh
@@ -128,6 +130,9 @@ export function useSpotsRemoval(
           : latest.current.listed;
         if (!data) continue;
         rejected = { version: data.version, ready: data.ready };
+        const pins = pinnedOnly(data.places);
+        followMovedPins(pending, pins, before);
+        before = pins;
         await savePlaces({
           itemId,
           version: data.version,

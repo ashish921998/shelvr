@@ -78,12 +78,24 @@ export function followMovedPins(
     const moved = found.find(
       (other) =>
         other.name === pin.name &&
-        !before.some((old) => at(old, other)) &&
+        !before.some((old) =>
+          other.appleId ? old.appleId === other.appleId : at(old, other),
+        ) &&
         !(other.appleId && pin.otherVenues?.includes(other.appleId)) &&
         distanceKm(other, pin) <= SAME_PLACE_KM,
     );
     if (moved) Object.assign(pin, { lat: moved.lat, lng: moved.lng });
   }
+}
+
+export function pinnedOnly(
+  places: readonly { name: string; lat?: number; lng?: number }[],
+): RevealPin[] {
+  return places.flatMap((place) =>
+    place.lat !== undefined && place.lng !== undefined
+      ? [{ ...place, lat: place.lat, lng: place.lng }]
+      : [],
+  );
 }
 
 export function keptPlaces<

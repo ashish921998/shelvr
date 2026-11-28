@@ -966,6 +966,27 @@ it("keeps a removed pin removed after a lookup moves it slightly", async () => {
   });
 });
 
+it("keeps a removal when the retry finds the pin moved after the screen closed", async () => {
+  twoSpots();
+  mocks.savePlaces.mockRejectedValueOnce(new Error("Places changed"));
+  const refined = { ...uchi, lat: uchi.lat + 0.00001 };
+  mocks.freshPlaces.mockResolvedValue({
+    places: [refined, duck, bakery],
+    version: "v2",
+    ready: true,
+  });
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  cleanup();
+  await flush();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [duck, bakery],
+  });
+});
+
 it("follows the save to another city after Edit places moves its places", () => {
   twoSpots();
   const { rerender } = render(<SpotsScreen />);
