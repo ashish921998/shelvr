@@ -97,6 +97,7 @@ export default function SpotsScreen() {
     (id ?? "") as Id<"items">,
     found,
     city !== null,
+    save?.placePins,
   );
   const focused = useIsFocused();
   useEffect(() => {

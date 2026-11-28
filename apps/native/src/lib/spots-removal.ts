@@ -41,6 +41,7 @@ export function useSpotsRemoval(
   itemId: Id<"items">,
   found: RevealPin[],
   revealed: boolean,
+  allPins: readonly RevealPin[] = [],
 ) {
   const convex = useConvex();
   const listed = useQuery(
@@ -184,7 +185,7 @@ export function useSpotsRemoval(
       analytics.capture("share_spots_place_removed", {
         pin_count: found.length,
       });
-      const known = [...found, ...pinnedOnly(listed?.places ?? [])];
+      const known = [...found, ...allPins, ...pinnedOnly(listed?.places ?? [])];
       const added = rowOf(pin, shown).map((member) =>
         member.appleId
           ? member

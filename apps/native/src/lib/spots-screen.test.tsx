@@ -1010,6 +1010,28 @@ it("never moves a removal onto a namesake the reveal did not show", async () => 
   });
 });
 
+it("never moves a removal onto a hidden namesake when ✕ is tapped before the list loads", async () => {
+  const cityless = { name: "Uchi", lat: uchi.lat + 0.0005, lng: uchi.lng };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin", "Dallas"],
+    placePins: [uchi, duck, cityless],
+  };
+  const { rerender, unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  mocks.save = { ...mocks.save, placePins: [duck, cityless] };
+  mocks.listed = { places: [duck, cityless], version: "v2", ready: true };
+  rerender(<SpotsScreen />);
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [duck, cityless],
+  });
+});
+
 it("follows the save to another city after Edit places moves its places", () => {
   twoSpots();
   const { rerender } = render(<SpotsScreen />);
