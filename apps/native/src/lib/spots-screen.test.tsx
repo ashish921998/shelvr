@@ -987,6 +987,29 @@ it("keeps a removal when the retry finds the pin moved after the screen closed",
   });
 });
 
+it("never moves a removal onto a namesake the reveal did not show", async () => {
+  const cityless = { name: "Uchi", lat: uchi.lat + 0.0005, lng: uchi.lng };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin", "Dallas"],
+    placePins: [uchi, duck, cityless],
+  };
+  mocks.listed = { places: [uchi, duck, cityless], version: "v1", ready: true };
+  const { rerender, unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  mocks.save = { ...mocks.save, placePins: [duck, cityless] };
+  mocks.listed = { places: [duck, cityless], version: "v2", ready: true };
+  rerender(<SpotsScreen />);
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [duck, cityless],
+  });
+});
+
 it("follows the save to another city after Edit places moves its places", () => {
   twoSpots();
   const { rerender } = render(<SpotsScreen />);

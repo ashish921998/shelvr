@@ -184,8 +184,17 @@ export function useSpotsRemoval(
       analytics.capture("share_spots_place_removed", {
         pin_count: found.length,
       });
+      const known = [...found, ...pinnedOnly(listed?.places ?? [])];
       const added = rowOf(pin, shown).map((member) =>
-        member.appleId ? member : { ...member, otherVenues: venuesAt(member) },
+        member.appleId
+          ? member
+          : {
+              ...member,
+              otherVenues: venuesAt(member),
+              namesakes: known.filter(
+                (other) => other.name === member.name && other !== member,
+              ),
+            },
       );
       undoPins.current = added;
       setStaged((pins) => [...pins, ...added]);

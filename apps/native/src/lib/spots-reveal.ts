@@ -14,7 +14,10 @@ export type RevealPin = {
   category?: string;
 };
 
-export type StagedPin = RevealPin & { otherVenues?: string[] };
+export type StagedPin = RevealPin & {
+  otherVenues?: string[];
+  namesakes?: RevealPin[];
+};
 
 export type RevealSave = {
   _id: string;
@@ -81,7 +84,7 @@ export function followMovedPins(
         (!other.city ||
           !pin.city ||
           cityKey(other.city) === cityKey(pin.city)) &&
-        !before.some((old) =>
+        ![...before, ...(pin.namesakes ?? [])].some((old) =>
           other.appleId ? old.appleId === other.appleId : at(old, other),
         ) &&
         !(other.appleId && pin.otherVenues?.includes(other.appleId)) &&
