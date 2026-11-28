@@ -652,9 +652,16 @@ it("keeps a list tick waiting until a spot removed during its write is saved too
   const { AlsoAddTo } = await import("@/components/shared-list/also-add-to");
   twoSpots();
   let finish = () => {};
-  mocks.savePlaces.mockReturnValueOnce(
-    new Promise<null>((resolve) => (finish = () => resolve(null))),
-  );
+  mocks.savePlaces
+    .mockReturnValueOnce(
+      new Promise<null>((resolve) => (finish = () => resolve(null))),
+    )
+    .mockRejectedValueOnce(new Error("Places changed"));
+  mocks.freshPlaces.mockResolvedValue({
+    places: [uchi, bakery],
+    version: "v2",
+    ready: true,
+  });
   render(<SpotsScreen />);
   fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
   const props = vi.mocked(AlsoAddTo).mock.lastCall?.[0];
@@ -667,12 +674,13 @@ it("keeps a list tick waiting until a spot removed during its write is saved too
     await tick;
   });
   expect(flushed).toBe(true);
-  expect(mocks.savePlaces).toHaveBeenCalledTimes(2);
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(3);
   expect(mocks.savePlaces).toHaveBeenLastCalledWith({
     itemId: "item-1",
-    version: "v1",
-    places: [duck, bakery],
+    version: "v2",
+    places: [bakery],
   });
+  expect(mocks.captureError).not.toHaveBeenCalled();
 });
 
 it("shows a spot again when Edit places adds back one the reveal removed", async () => {
