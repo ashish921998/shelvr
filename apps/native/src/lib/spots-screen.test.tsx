@@ -543,7 +543,7 @@ it("writes again once a save that was being reprocessed is ready with the same p
   expect(mocks.captureError).not.toHaveBeenCalled();
 });
 
-it("gives up when no list newer than the rejected one arrives", async () => {
+it("sends the same ready list once more when nothing newer arrives, then reports", async () => {
   vi.useFakeTimers();
   twoSpots();
   mocks.savePlaces.mockRejectedValue(new Error("Places changed"));
@@ -555,11 +555,27 @@ it("gives up when no list newer than the rejected one arrives", async () => {
   expect(mocks.savePlaces).toHaveBeenCalledOnce();
   expect(mocks.captureError).not.toHaveBeenCalled();
   await act(() => vi.advanceTimersByTimeAsync(200));
-  expect(mocks.savePlaces).toHaveBeenCalledOnce();
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(2);
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith(
+    expect.objectContaining({ version: "v1" }),
+  );
   expect(mocks.captureError).toHaveBeenCalledWith(
     "spots_removal_failed",
     expect.any(Error),
   );
+});
+
+it("saves when a write rejected mid-reprocessing is retried after the save is ready again", async () => {
+  vi.useFakeTimers();
+  twoSpots();
+  mocks.savePlaces.mockRejectedValueOnce(new Error("Places changed"));
+  mocks.freshPlaces.mockImplementation(() => mocks.listed);
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  cleanup();
+  await act(() => vi.advanceTimersByTimeAsync(3100));
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(2);
+  expect(mocks.captureError).not.toHaveBeenCalled();
 });
 
 it("reports a failed write when the fresh list cannot be read", async () => {

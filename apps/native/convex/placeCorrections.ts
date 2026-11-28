@@ -187,6 +187,9 @@ function removalEdit(
     hiddenLabels: (item.places ?? []).filter(
       (name) => !(visible.places ?? []).includes(name),
     ),
+    hidesIntents: (item.intents ?? []).some(
+      (intent) => !shownIntents.includes(intent),
+    ),
     placeCuisines: item.placeCuisines?.filter((row) => !gone(row.name)),
     intents: item.intents?.filter(
       (intent) =>
@@ -203,7 +206,10 @@ function editedScope(
   removal: ReturnType<typeof removalEdit> | null,
 ) {
   const waiting = (removal?.pending.length ?? 0) > 0;
-  const labelled = waiting || (removal?.hiddenLabels.length ?? 0) > 0;
+  const labelled =
+    waiting ||
+    (removal?.hiddenLabels.length ?? 0) > 0 ||
+    removal?.hidesIntents === true;
   const cities = normalizeCities([
     ...chosen.flatMap((place) =>
       place.city ? [place.city] : (item.cities ?? []),

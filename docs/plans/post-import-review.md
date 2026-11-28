@@ -177,7 +177,8 @@ involved.
   hits a mismatch, it retries once against a ready list whose version differs from the rejected one, or against
   the same version once a save that was reprocessing is ready again.
   The client's `query()` would return the subscription's cached copy, so the retry watches the
-  query and waits up to 3 s for the newer version, then gives up with
+  query and waits up to 3 s for the newer version, then sends the same ready list once (the
+  rejection may have come while the save was reprocessing), then gives up with
   `captureError("spots_removal_failed")`. It never blocks navigation.
 - **A pin lands after the write.** `storePins` is guarded by its own version (run id plus cities,
   `convex/placePins.ts:199`), and it keeps only wanted places (`wantedPlaces`, `placePins.ts:150`).

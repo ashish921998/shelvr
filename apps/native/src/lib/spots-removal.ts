@@ -81,12 +81,13 @@ export function useSpotsRemoval(
   const newerList = (rejected: { version: string; ready: boolean } | null) =>
     new Promise<typeof listed | null>((resolve, reject) => {
       let busy = rejected?.ready === false;
+      let same: typeof listed | null = null;
       const watch = convex.watchQuery(api.placeCorrections.getPlaces, {
         itemId,
       });
       let stop = () => {};
       const timer = setTimeout(
-        () => settle(() => resolve(null)),
+        () => settle(() => resolve(same)),
         NEWER_LIST_MS,
       );
       const settle = (end: () => void) => {
@@ -101,6 +102,7 @@ export function useSpotsRemoval(
           if (data?.ready === false) busy = true;
           else if (data === null || busy || data.version !== rejected?.version)
             settle(() => resolve(data));
+          else same = data;
         } catch (error) {
           settle(() => reject(error));
         }

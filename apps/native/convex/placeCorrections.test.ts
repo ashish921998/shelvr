@@ -778,6 +778,37 @@ describe("removing places from one save", () => {
     const after = await t.query(api.placeCorrections.getPlaces, { itemId });
     expect(after?.places).toEqual([]);
   });
+  it("keeps a hidden map link hidden when the last shown place is removed", async () => {
+    const { base, t, userId, itemId } = await setup(false);
+    const tasca = {
+      kind: "open_maps" as const,
+      label: "Tasca",
+      value: "Tasca Ze",
+    };
+    await base.run(async (ctx) => {
+      await ctx.db.patch(itemId, {
+        places: [second.name],
+        placePins: [second],
+        intents: [tasca],
+      });
+      await ctx.db.insert("placeRemovals", {
+        userId,
+        ...original,
+        name: tasca.value,
+      });
+    });
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, second.name),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({ cities: ["Lisbon"], intents: [tasca] });
+    const shown = await t.query(api.items.getItem, { id: itemId });
+    expect(shown?.intents ?? []).not.toContainEqual(tasca);
+  });
   it("keeps the save's city when the only place left is a hidden pin with no city", async () => {
     const { base, t, userId, itemId } = await setup(false);
     const { city: _city, ...cityless } = original;
