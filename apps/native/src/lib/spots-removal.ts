@@ -28,6 +28,7 @@ export function useSpotsRemoval(
   const savePlaces = useMutation(api.placeCorrections.savePlaces);
   const [staged, setStaged] = useState<RevealPin[]>([]);
   const [undo, setUndo] = useState<RevealPin | null>(null);
+  const undoPins = useRef<RevealPin[]>([]);
   const latest = useRef({ listed, staged, revealed, count: found.length });
   useEffect(() => {
     latest.current = { listed, staged, revealed, count: found.length };
@@ -105,7 +106,11 @@ export function useSpotsRemoval(
         pin_count: found.length,
       });
       const row = found.filter((other) => oneRow(pin, other));
-      setStaged((pins) => [...pins, ...(row.length > 0 ? row : [pin])]);
+      const added = (row.length > 0 ? row : [pin]).filter(
+        (other) => !staged.includes(other),
+      );
+      undoPins.current = added;
+      setStaged((pins) => [...pins, ...added]);
       setUndo(pin);
     },
     restore: () => {
@@ -113,9 +118,8 @@ export function useSpotsRemoval(
       analytics.capture("share_spots_place_restored", {
         pin_count: found.length,
       });
-      setStaged((pins) =>
-        pins.filter((pin) => pin !== undo && !oneRow(undo, pin)),
-      );
+      const added = undoPins.current;
+      setStaged((pins) => pins.filter((pin) => !added.includes(pin)));
       setUndo(null);
     },
     fix: async () => {

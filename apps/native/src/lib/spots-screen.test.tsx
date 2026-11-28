@@ -737,3 +737,28 @@ it("follows the save to another city after Edit places moves its places", () => 
   expect(screen.getByText("Pecan Lodge")).toBeTruthy();
   expect(screen.queryByText("spots.noneLeft")).toBeNull();
 });
+
+it("undoes only the pins its own removal took from a chain of merged rows", async () => {
+  const a = { name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" };
+  const b = { ...a, lat: 30.2622 };
+  const c = { ...a, lat: 30.2644 };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [a, b, c, duck],
+  };
+  mocks.listed = { places: [a, b, c, duck], version: "v1", ready: true };
+  const { unmount } = render(<SpotsScreen />);
+  const [first, second] = screen.getAllByLabelText(removeLabel("Uchi"));
+  fireEvent.click(first);
+  fireEvent.click(second);
+  fireEvent.click(screen.getByText("common.undo"));
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [c, duck],
+  });
+});
