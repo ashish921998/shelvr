@@ -38,7 +38,7 @@ export function useSpotsRemoval(
     return () => clearTimeout(timer);
   }, [undo]);
 
-  const persist = async () => {
+  const persistOnce = async () => {
     const from = written.current;
     const pending = latest.current.staged.slice(from);
     if (pending.length === 0) return true;
@@ -64,6 +64,12 @@ export function useSpotsRemoval(
     written.current = Math.min(written.current, from);
     analytics.captureError("spots_removal_failed", failure);
     return false;
+  };
+  const persist = async () => {
+    while (latest.current.staged.length > written.current) {
+      if (!(await persistOnce())) return false;
+    }
+    return true;
   };
   const write = () => (queue.current = queue.current.then(persist));
 

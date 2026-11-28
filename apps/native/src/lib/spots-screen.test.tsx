@@ -647,3 +647,30 @@ it("makes a shared-list tick wait for a removal write already in flight", async 
   expect(flushed).toBe(true);
   expect(mocks.savePlaces).toHaveBeenCalledOnce();
 });
+
+it("keeps a list tick waiting until a spot removed during its write is saved too", async () => {
+  const { AlsoAddTo } = await import("@/components/shared-list/also-add-to");
+  twoSpots();
+  let finish = () => {};
+  mocks.savePlaces.mockReturnValueOnce(
+    new Promise<null>((resolve) => (finish = () => resolve(null))),
+  );
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  const props = vi.mocked(AlsoAddTo).mock.lastCall?.[0];
+  let flushed: boolean | undefined;
+  const tick = props?.beforeToggle?.().then((ok) => (flushed = ok));
+  await flush();
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  await act(async () => {
+    finish();
+    await tick;
+  });
+  expect(flushed).toBe(true);
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(2);
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [duck, bakery],
+  });
+});
