@@ -144,6 +144,18 @@ function settledTitle(
     : (words.title ?? item.title);
 }
 
+function keepEditedPlaces(item: Doc<"items">, words: Words): void {
+  words.cities = item.cities ?? [];
+  words.places = item.places ?? [];
+  words.placeLocations = item.placeLocations;
+  words.placeCuisines = item.placeCuisines;
+  const maps = (item.intents ?? []).filter(
+    (intent) => intent.kind === "open_maps",
+  );
+  const others = words.intents?.filter((intent) => intent.kind !== "open_maps");
+  words.intents = maps.length > 0 ? [...(others ?? []), ...maps] : others;
+}
+
 /** A key set to `undefined` removes that field from the row, hence the `??` fallbacks and conditional spreads. */
 export function completionPatch(
   item: Doc<"items">,
@@ -152,15 +164,7 @@ export function completionPatch(
 ): ItemPatch {
   const { reading } = run;
   const words = settledWords(item, run, aiAllowed);
-  if (item.placesEdited) {
-    words.cities = item.cities ?? [];
-    words.places = item.places ?? [];
-    words.placeLocations = item.placeLocations;
-    words.placeCuisines = undefined;
-    words.intents = words.intents?.filter(
-      (intent) => intent.kind !== "open_maps",
-    );
-  }
+  if (item.placesEdited) keepEditedPlaces(item, words);
   const title = settledTitle(item, run.keepTitle, words);
   const earlier = item.enrichment === "partial" ? item : undefined;
   const content = reading.content || earlier?.content;

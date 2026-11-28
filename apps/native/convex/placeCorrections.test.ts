@@ -392,6 +392,42 @@ describe("removing places from one save", () => {
     );
     expect(jobs.map((job) => job.name)).not.toContain("placePins:locateItem");
   });
+  it("keeps the kept place's cuisine and map link through reprocessing", async () => {
+    const { base, t, itemId, data } = await twoPlaces(false);
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, second.name, label),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    if (!item) throw new Error("Missing save");
+    const patch = completionPatch(
+      item,
+      {
+        reading: {},
+        classification: {
+          description: "Read again",
+          tags: [],
+          cities: ["Lisbon"],
+          places: [second.name],
+          placeCuisines: [{ name: second.name, cuisine: "bakery" }],
+          intents: [
+            { kind: "open_maps", label: "Bakery", value: second.name },
+            { kind: "copy", label: "Code", value: "SAVE20" },
+          ],
+        },
+      },
+      true,
+    );
+    expect(patch).toMatchObject({
+      places: [original.name],
+      placeCuisines: [{ name: original.name, cuisine: "burger" }],
+      intents: [
+        { kind: "copy", label: "Code", value: "SAVE20" },
+        { kind: "open_maps", label: "Old", value: original.name },
+      ],
+    });
+  });
   it("does not let a later lookup bring a removed place back", async () => {
     const { base, t, userId, itemId, data } = await twoPlaces(false);
     await base.run(async (ctx) => {
