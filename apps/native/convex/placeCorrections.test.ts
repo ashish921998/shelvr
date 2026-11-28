@@ -710,6 +710,7 @@ describe("removing places from one save", () => {
     });
     const item = await base.run((ctx) => ctx.db.get(itemId));
     expect(item).toMatchObject({
+      cities: ["Lisbon"],
       places: [original.name],
       placePins: [{ ...original, cuisine: "burger" }],
       placeCuisines: [{ name: original.name, cuisine: "burger" }],

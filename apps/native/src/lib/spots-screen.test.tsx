@@ -524,6 +524,25 @@ it("retries once against a fresh list, then reports a failed write", async () =>
   );
 });
 
+it("writes again once a save that was being reprocessed is ready with the same places", async () => {
+  twoSpots();
+  mocks.listed = { ...mocks.listed!, ready: false };
+  mocks.savePlaces.mockRejectedValueOnce(new Error("Places changed"));
+  mocks.freshPlaces.mockResolvedValue({ ...mocks.listed, ready: true });
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  cleanup();
+  await flush();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledTimes(2);
+  expect(mocks.savePlaces).toHaveBeenLastCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [uchi, bakery],
+  });
+  expect(mocks.captureError).not.toHaveBeenCalled();
+});
+
 it("gives up when no list newer than the rejected one arrives", async () => {
   vi.useFakeTimers();
   twoSpots();

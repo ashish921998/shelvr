@@ -78,8 +78,9 @@ export function useSpotsRemoval(
     return () => clearTimeout(timer);
   }, [undo]);
 
-  const newerList = (rejected: string | undefined) =>
+  const newerList = (rejected: { version: string; ready: boolean } | null) =>
     new Promise<typeof listed | null>((resolve, reject) => {
+      let busy = rejected?.ready === false;
       const watch = convex.watchQuery(api.placeCorrections.getPlaces, {
         itemId,
       });
@@ -96,7 +97,9 @@ export function useSpotsRemoval(
       const read = () => {
         try {
           const data = watch.localQueryResult();
-          if (data !== undefined && data?.version !== rejected)
+          if (data === undefined) return;
+          if (data?.ready === false) busy = true;
+          else if (data === null || busy || data.version !== rejected?.version)
             settle(() => resolve(data));
         } catch (error) {
           settle(() => reject(error));
@@ -109,12 +112,14 @@ export function useSpotsRemoval(
   const persistOnce = async (pending: StagedPin[]) => {
     setUndo(null);
     let failure: unknown = null;
-    let rejected: string | undefined;
+    let rejected: { version: string; ready: boolean } | null = null;
     for (const fresh of [false, true]) {
       try {
-        const data = fresh ? await newerList(rejected) : latest.current.listed;
+        const data: typeof listed | null = fresh
+          ? await newerList(rejected)
+          : latest.current.listed;
         if (!data) continue;
-        rejected = data.version;
+        rejected = { version: data.version, ready: data.ready };
         await savePlaces({
           itemId,
           version: data.version,

@@ -172,7 +172,8 @@ involved.
 - **The list changes before the write.** `savePlaces` rejects a stale `version` ("Places changed;
   reopen this save"). The reveal subscribes to `api.placeCorrections.getPlaces` for `version`. On
   leaving, it applies the staged removals to the latest list and writes once. If the write still
-  hits a mismatch, it retries once against a list whose version differs from the rejected one.
+  hits a mismatch, it retries once against a ready list whose version differs from the rejected one, or against
+  the same version once a save that was reprocessing is ready again.
   The client's `query()` would return the subscription's cached copy, so the retry watches the
   query and waits up to 3 s for the newer version, then gives up with
   `captureError("spots_removal_failed")`. It never blocks navigation.
