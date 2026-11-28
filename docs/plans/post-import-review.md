@@ -94,7 +94,9 @@ When the new list is the current list with places removed (same order, no add, n
   name a place not yet pinned. The removal adds those names to `places`, unless one names a row
   the save already lists, so `placesEdited` doesn't stop their pins from landing. A link that names
   a removed place's venue ("Lucy's, Montrose" after removing "Lucy's") is dropped with it, unless a
-  kept place shares that venue or the link ends in another of the save's cities. While such names
+  kept place shares that venue or the link ends in another of the save's cities. When the removed
+  place names an area, the link's area must match, so removing "Joe's, Carmine St" keeps a waiting
+  "Joe's, Broadway". While such names
   wait, the save keeps its cities, so a lookup already running can still store their pins; if the
   cities change anyway, the removal starts a new lookup.
 - **Labels go with their pin, on the reveal:** the reveal client also leaves out an unpinned label

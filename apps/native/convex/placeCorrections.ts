@@ -147,10 +147,17 @@ function removalEdit(
         city.toLowerCase() !== place.city?.toLowerCase() &&
         withoutCitySuffix(name, city) !== null,
     );
-  const venue = (place: EditablePlace, name: string) =>
-    !elsewhere(place, name) &&
-    keyOf(splitSavedPlace(name).name, place.city) ===
-      keyOf(splitSavedPlace(place.name).name, place.city);
+  const parts = (name: string, city: string | undefined) =>
+    splitSavedPlace((city && withoutCitySuffix(name, city)) || name);
+  const venue = (place: EditablePlace, name: string) => {
+    const own = parts(place.name, place.city);
+    const other = parts(name, place.city);
+    return (
+      !elsewhere(place, name) &&
+      keyOf(other.name, place.city) === keyOf(own.name, place.city) &&
+      (own.area === "" || own.area.toLowerCase() === other.area.toLowerCase())
+    );
+  };
   const removed = current.filter((_, index) => !kept.has(index));
   const gone = (name: string) =>
     (removed.some((place) => names(place, name)) &&

@@ -524,6 +524,39 @@ describe("removing places from one save", () => {
     });
     return ready;
   }
+  it("keeps another branch a map link waits on when one branch is removed", async () => {
+    const { base, t, userId, itemId } = await setup(false);
+    const carmine = { ...original, name: "Joe's, Carmine St" };
+    const broadway = { ...original, name: "Joe's, Broadway", lat: 38.75 };
+    await base.run(async (ctx) => {
+      await ctx.db.patch(itemId, {
+        places: [original.name, carmine.name],
+        placePins: [original, carmine],
+      });
+      const spaceId = await ctx.db.insert("spaces", { userId, name: "Lisbon" });
+      await ctx.db.insert("spaceItems", {
+        userId,
+        spaceId,
+        itemId,
+        status: "saved",
+        intents: [{ kind: "open_maps", label: "Joe's", value: broadway.name }],
+      });
+    });
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, carmine.name),
+    });
+    await storeCurrentPins(base, { itemId, found: [broadway] });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.places).toEqual([original.name, broadway.name]);
+    expect(item?.placePins?.map((pin) => pin.name)).toEqual([
+      original.name,
+      broadway.name,
+    ]);
+  });
   it("lets a lookup already running pin a place a map link still waits on", async () => {
     const { base, t, itemId } = await waitingOnLuso(false);
     const running = await base.query(internal.placePins.toLocate, { itemId });
