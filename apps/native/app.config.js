@@ -198,6 +198,13 @@ module.exports = ({ config }) => ({
             supportedFamilies: ["systemSmall", "systemMedium"],
             contentMarginsDisabled: true,
           },
+          {
+            name: "TripCountdown",
+            displayName: "Trip Countdown",
+            description: "Days until your next trip.",
+            supportedFamilies: ["systemSmall", "systemMedium"],
+            contentMarginsDisabled: true,
+          },
         ],
       },
     ],

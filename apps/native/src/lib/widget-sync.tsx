@@ -1,4 +1,3 @@
-import Constants from "expo-constants";
 import { t, useAppLocale } from "./i18n";
 import type { FeedItem } from "@/lib/feed-item";
 import { analytics } from "@/lib/analytics";
@@ -11,8 +10,14 @@ import { Directory, File, Paths } from "expo-file-system";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
-import { Images } from "react-native-nitro-image";
 import { recentSavesWidget } from "recent-saves-widget";
+import {
+  ensureWidgetImage,
+  WIDGET_DOWNLOAD_PREFIX,
+  WIDGET_IMAGE_TIMEOUT,
+} from "@/lib/widget-image";
+import { widgetScheme } from "@/lib/widget-scheme";
+import { clearTripCountdownWidget } from "@/lib/trip-countdown-sync";
 import type {
   RecentSavesWidgetProps,
   WidgetSaveItem,
@@ -20,13 +25,9 @@ import type {
 
 const WIDGET_ITEM_COUNT = 5;
 const THUMB_PREFIX = "recent-saves-";
-const DOWNLOAD_PREFIX = "widget-download-";
-const THUMB_MAX_DIM = 512;
-const THUMBNAIL_TIMEOUT_MS = 30_000;
-const THUMBNAIL_TIMEOUT = "widget_thumbnail_timeout";
+const DOWNLOAD_PREFIX = WIDGET_DOWNLOAD_PREFIX;
+const THUMBNAIL_TIMEOUT = WIDGET_IMAGE_TIMEOUT;
 const WIDGET_LOCK_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
-
-let thumbnailAttempt = 0;
 
 async function ensureThumbnail(
   dir: Directory,
@@ -34,71 +35,12 @@ async function ensureThumbnail(
 ): Promise<string | undefined> {
   const url = item.imageUrl ?? item.heroImageUrl;
   if (!url) return undefined;
-  const thumb = new File(dir, `${THUMB_PREFIX}${item._id}.jpg`);
-  if (thumb.exists) return thumb.uri;
-
-  const tag = `${item._id}-${++thumbnailAttempt}`;
-  const download = new File(Paths.cache, `${DOWNLOAD_PREFIX}${tag}`);
-  const staged = new File(Paths.cache, `${DOWNLOAD_PREFIX}${tag}.jpg`);
-  deleteQuietly(download);
-  deleteQuietly(staged);
-  const build = buildThumbnail(url, download, staged).finally(() =>
-    deleteQuietly(download),
+  return ensureWidgetImage(
+    dir,
+    `${THUMB_PREFIX}${item._id}.jpg`,
+    url,
+    item._id,
   );
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    await Promise.race([
-      build,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(THUMBNAIL_TIMEOUT)),
-          THUMBNAIL_TIMEOUT_MS,
-        );
-      }),
-    ]).finally(() => clearTimeout(timer));
-  } catch (error) {
-    const discard = () => deleteQuietly(staged);
-    build.then(discard, discard);
-    throw error;
-  }
-  try {
-    staged.moveSync(thumb, { overwrite: true });
-  } catch (error) {
-    deleteQuietly(staged);
-    throw error;
-  }
-  return thumb.uri;
-}
-
-async function buildThumbnail(
-  url: string,
-  download: File,
-  staged: File,
-): Promise<void> {
-  await File.downloadFileAsync(url, download);
-  const image = await Images.loadFromFileAsync(toPlainPath(download.uri));
-  const scale = Math.min(
-    1,
-    THUMB_MAX_DIM / Math.max(image.width, image.height),
-  );
-  const resized =
-    scale < 1
-      ? await image.resizeAsync(
-          Math.round(image.width * scale),
-          Math.round(image.height * scale),
-        )
-      : image;
-  await resized.saveToFileAsync(toPlainPath(staged.uri), "jpg", 80);
-}
-
-function deleteQuietly(file: File) {
-  try {
-    if (file.exists) file.delete();
-  } catch {}
-}
-
-function toPlainPath(uri: string): string {
-  return decodeURIComponent(uri.replace(/^file:\/\//, ""));
 }
 
 function widgetTitle(item: FeedItem): string {
@@ -239,12 +181,7 @@ async function syncWidget(
       emptyTitle: t("widget.proTitle"),
       emptyHint: t("widget.proBody"),
     };
-    const scheme =
-      Constants.expoConfig?.extra?.variant === "production"
-        ? "shelvr"
-        : Constants.expoConfig?.extra?.variant === "preview"
-          ? "shelvr-preview"
-          : "shelvr-dev";
+    const scheme = widgetScheme();
     const current: RecentSavesWidgetProps = {
       scheme,
       items: widgetItems,
@@ -306,14 +243,20 @@ async function clearWidgetAndPendingThumbnails(
   generation: number,
   pendingSync: Promise<unknown>,
 ): Promise<boolean> {
+  const tripCleared = clearTripCountdownWidget();
+  tripCleared.catch(() => {});
   try {
     return await clearWidgetSnapshot(generation);
   } finally {
-    await pendingSync;
     try {
-      await clearWidgetFiles(generation);
-    } catch {
-      await clearWidgetFiles(generation);
+      await pendingSync;
+      try {
+        await clearWidgetFiles(generation);
+      } catch {
+        await clearWidgetFiles(generation);
+      }
+    } finally {
+      await tripCleared;
     }
   }
 }

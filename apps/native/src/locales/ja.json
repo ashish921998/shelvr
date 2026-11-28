@@ -647,6 +647,17 @@
   "errors.saveFallback": "保存に失敗しました。もう一度お試しください。",
   "widget.title": "最近の保存",
   "widget.description": "最近保存したものをひと目で確認。",
+  "tripWidget.title": "旅行カウントダウン",
+  "tripWidget.description": "次の旅行までの日数。",
+  "tripWidget.daysToGo": {
+    "other": "あと%{formattedCount}日"
+  },
+  "tripWidget.tomorrow": "明日",
+  "tripWidget.today": "今日",
+  "tripWidget.dayOf": "%{days}日間の%{day}日目",
+  "tripWidget.onDate": "%{date}から",
+  "tripWidget.emptyTitle": "予定している旅行はありません",
+  "tripWidget.emptyBody": "旅行に日付を追加するとカウントダウンが始まります",
   "permissions.photosUsage": "Shelvrでは、ライブラリの写真やスクリーンショットをハブに保存したり、写真ライブラリを整理したりできます。",
   "permissions.photosAddUsage": "Shelvrは、パスポートのストーリーなど、シェアした画像を写真に保存します。",
   "permissions.calendarUsage": "Shelvrは保存した内容からカレンダーに予定を追加します。",

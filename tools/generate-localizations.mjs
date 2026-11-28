@@ -176,7 +176,12 @@ await writeGenerated(
 );
 
 const widgetStrings = Object.fromEntries(
-  ["widget.title", "widget.description"].map((key) => [
+  [
+    "widget.title",
+    "widget.description",
+    "tripWidget.title",
+    "tripWidget.description",
+  ].map((key) => [
     source[key],
     {
       extractionState: "manual",

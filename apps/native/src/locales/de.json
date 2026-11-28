@@ -664,6 +664,18 @@
   "errors.saveFallback": "Speichern fehlgeschlagen. Bitte versuche es erneut.",
   "widget.title": "Zuletzt gespeichert",
   "widget.description": "Deine neuesten Inhalte auf einen Blick.",
+  "tripWidget.title": "Reise-Countdown",
+  "tripWidget.description": "Die Tage bis zu deiner nächsten Reise.",
+  "tripWidget.daysToGo": {
+    "one": "Noch %{formattedCount} Tag",
+    "other": "Noch %{formattedCount} Tage"
+  },
+  "tripWidget.tomorrow": "Morgen",
+  "tripWidget.today": "Heute",
+  "tripWidget.dayOf": "Tag %{day} von %{days}",
+  "tripWidget.onDate": "Am %{date}",
+  "tripWidget.emptyTitle": "Keine Reise geplant",
+  "tripWidget.emptyBody": "Gib einer Reise ein Datum, um den Countdown zu starten",
   "permissions.photosUsage": "Mit Shelvr kannst du Fotos und Bildschirmfotos aus deiner Mediathek in deiner Bibliothek speichern und deine Fotomediathek aufräumen.",
   "permissions.photosAddUsage": "Shelvr speichert Bilder, die du teilst, wie deine Pass-Story, in deinen Fotos.",
   "permissions.calendarUsage": "Shelvr fügt deinem Kalender Ereignisse aus deinen gespeicherten Inhalten hinzu.",

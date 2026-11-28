@@ -122,7 +122,10 @@ export type AnalyticsEventProperties = {
   };
   auth_completed: Record<string, never>;
   widget_cleared: Record<string, never>;
-  widget_sync_failed: { reason: "timeout" | "error" };
+  widget_sync_failed: {
+    reason: "timeout" | "error";
+    widget?: "trip_countdown";
+  };
   paywall_requested: PaywallAttemptProperties;
   paywall_presentation_started: PaywallAttemptProperties;
   paywall_shown: PaywallOutcomeProperties;

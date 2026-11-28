@@ -608,6 +608,15 @@ type MessageParams = {
   "errors.saveFallback": undefined;
   "widget.title": undefined;
   "widget.description": undefined;
+  "tripWidget.title": undefined;
+  "tripWidget.description": undefined;
+  "tripWidget.daysToGo": { count: number };
+  "tripWidget.tomorrow": undefined;
+  "tripWidget.today": undefined;
+  "tripWidget.dayOf": { day: string; days: string };
+  "tripWidget.onDate": { date: string };
+  "tripWidget.emptyTitle": undefined;
+  "tripWidget.emptyBody": undefined;
   "permissions.photosUsage": undefined;
   "permissions.photosAddUsage": undefined;
   "permissions.calendarUsage": undefined;

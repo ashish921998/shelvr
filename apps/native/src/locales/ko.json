@@ -647,6 +647,17 @@
   "errors.saveFallback": "저장에 실패했어요. 다시 시도해 주세요.",
   "widget.title": "최근 저장 항목",
   "widget.description": "최근 저장한 항목을 한눈에 보세요.",
+  "tripWidget.title": "여행 카운트다운",
+  "tripWidget.description": "다음 여행까지 남은 날을 보세요.",
+  "tripWidget.daysToGo": {
+    "other": "%{formattedCount}일 남음"
+  },
+  "tripWidget.tomorrow": "내일",
+  "tripWidget.today": "오늘",
+  "tripWidget.dayOf": "%{days}일 중 %{day}일째",
+  "tripWidget.onDate": "%{date} 출발",
+  "tripWidget.emptyTitle": "다가오는 여행이 없어요",
+  "tripWidget.emptyBody": "여행에 날짜를 추가하면 카운트다운이 시작돼요",
   "permissions.photosUsage": "Shelvr에서 라이브러리의 사진과 스크린샷을 보관함에 저장하고 사진 라이브러리를 정리할 수 있어요.",
   "permissions.photosAddUsage": "Shelvr는 여권 스토리처럼 공유한 이미지를 사진에 저장해요.",
   "permissions.calendarUsage": "Shelvr는 저장한 내용에서 일정을 추출해 캘린더에 추가해요.",
