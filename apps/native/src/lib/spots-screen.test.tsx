@@ -568,7 +568,11 @@ it("writes staged removals before a shared list copies the save's places", async
   render(<SpotsScreen />);
   fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
   const props = vi.mocked(AlsoAddTo).mock.lastCall?.[0];
-  await act(() => props?.beforeToggle?.() ?? Promise.resolve());
+  let flushed: boolean | undefined;
+  await act(async () => {
+    flushed = await props?.beforeToggle?.();
+  });
+  expect(flushed).toBe(true);
   expect(mocks.savePlaces).toHaveBeenCalledWith({
     itemId: "item-1",
     version: "v1",
@@ -585,7 +589,11 @@ it("writes a removal again on leaving when an earlier write failed", async () =>
   const { unmount } = render(<SpotsScreen />);
   fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
   const props = vi.mocked(AlsoAddTo).mock.lastCall?.[0];
-  await act(() => props?.beforeToggle?.() ?? Promise.resolve());
+  let flushed: boolean | undefined;
+  await act(async () => {
+    flushed = await props?.beforeToggle?.();
+  });
+  expect(flushed).toBe(false);
   expect(mocks.captureError).toHaveBeenCalledWith(
     "spots_removal_failed",
     expect.any(Error),

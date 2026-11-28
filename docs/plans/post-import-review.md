@@ -92,7 +92,9 @@ When the new list is the current list with places removed (same order, no add, n
 - **Labels go with their pin, on the reveal:** the reveal client also leaves out an unpinned label
   for a removed pin ("Lucy's, Montrose" after removing the pin "Lucy's"), or `locateItem` would
   look it up again. It matches the name, and the area when the pin has one, so removing
-  "Joe's, Carmine St" keeps "Joe's, Broadway".
+  "Joe's, Carmine St" keeps "Joe's, Broadway". When the pin has no area, the label must be in
+  the pin's city, so a multi-city save keeps "Taco Bar, Dallas". Also add to writes these removals
+  before a toggle and skips the toggle if the write fails.
 
 **Free users may remove, not add.** Saving is free under `FREE_SAVES_ENABLED`, but every correction
 needs Pro today (`requireProEntitlement` at `convex/placeCorrections.ts:121`). A free user who sees

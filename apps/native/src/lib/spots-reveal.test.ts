@@ -174,12 +174,16 @@ describe("keptPlaces", () => {
     const joes = { name: "Joe's, Carmine St", lat: 40.73, lng: -74.0 };
     const places = [
       taco,
-      { name: "taco bar, East Austin" },
+      { name: "taco bar, East Austin", city: "Austin" },
       { name: "Taco Barn" },
       joes,
       { name: "Joe's, Broadway" },
       { name: "Joe's, Carmine St" },
     ];
     expect(keptPlaces(places, [taco, joes])).toEqual([places[2], places[4]]);
+  });
+  it("keeps a namesake label in another city of a multi-city save", () => {
+    const places = [taco, { name: "Taco Bar, Dallas" }];
+    expect(keptPlaces(places, [taco])).toEqual([places[1]]);
   });
 });

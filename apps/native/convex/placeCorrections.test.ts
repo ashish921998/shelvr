@@ -350,7 +350,11 @@ describe("removing places from one save", () => {
         ],
         intents: [
           { kind: "open_maps", label: "Old", value: original.name },
-          { kind: "open_maps", label: "Bakery", value: second.name },
+          {
+            kind: "open_maps",
+            label: "Bakery",
+            value: `${second.name}, Lisbon`,
+          },
           { kind: "copy", label: "Code", value: "SAVE10" },
         ],
       }),

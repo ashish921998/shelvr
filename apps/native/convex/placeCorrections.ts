@@ -9,6 +9,7 @@ import {
   MAX_ITEM_PLACES,
   normalizeCities,
   normalizePlaceLocations,
+  savedPlaceKey,
 } from "./model/itemFields";
 import {
   isRemovedSuggestion,
@@ -125,14 +126,16 @@ function removalEdit(
   chosen: EditablePlace[],
   current: EditablePlace[],
 ) {
-  const keptNames = new Set(chosen.map((place) => place.name.toLowerCase()));
+  const keyOf = (name: string) =>
+    savedPlaceKey(name, visible.cities) || name.toLowerCase();
+  const keptKeys = new Set(chosen.map((place) => keyOf(place.name)));
   const removed = new Set(
     current
       .filter((place) => !chosen.some((kept) => samePlace(kept, place)))
-      .map((place) => place.name.toLowerCase())
-      .filter((name) => !keptNames.has(name)),
+      .map((place) => keyOf(place.name))
+      .filter((key) => !keptKeys.has(key)),
   );
-  const gone = (name: string) => removed.has(name.toLowerCase());
+  const gone = (name: string) => removed.has(keyOf(name));
   return {
     kept: chosen,
     placePins: (visible.placePins ?? []).filter((pin) =>

@@ -40,7 +40,7 @@ export function useSpotsRemoval(
   const write = async () => {
     const from = written.current;
     const pending = latest.current.staged.slice(from);
-    if (pending.length === 0) return;
+    if (pending.length === 0) return true;
     written.current = latest.current.staged.length;
     setUndo(null);
     let failure: unknown = null;
@@ -55,13 +55,14 @@ export function useSpotsRemoval(
           version: data.version,
           places: keptPlaces(data.places, pending),
         });
-        return;
+        return true;
       } catch (error) {
         failure = error;
       }
     }
     written.current = Math.min(written.current, from);
     analytics.captureError("spots_removal_failed", failure);
+    return false;
   };
 
   const leave = (via: SpotsExit) => {

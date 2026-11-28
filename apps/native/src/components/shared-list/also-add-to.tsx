@@ -10,6 +10,7 @@ import {
   withLine,
 } from "@/lib/shared-lists";
 import type { Id } from "@convex/_generated/dataModel";
+import { useRef } from "react";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import Animated from "react-native-reanimated";
@@ -25,12 +26,13 @@ export function AlsoAddTo({
   itemId: Id<"items">;
   city: string;
   count: number;
-  beforeToggle?: () => Promise<void>;
+  beforeToggle?: () => Promise<boolean>;
 }) {
   const { theme } = useUnistyles();
   const reduced = useLiveReducedMotion();
   const lists = alsoAddLists(useSharedLists().data);
   const { state, toggle } = useAlsoAddTo(itemId, city);
+  const pending = useRef(false);
   if (lists.length === 0) return null;
   return (
     <View style={styles.section}>
@@ -56,8 +58,14 @@ export function AlsoAddTo({
             accessibilityState={{ checked: on, busy, disabled: busy }}
             disabled={busy}
             onPress={async () => {
-              await beforeToggle?.();
-              await toggle(list);
+              if (pending.current) return;
+              pending.current = true;
+              try {
+                if ((await beforeToggle?.()) === false) return;
+                await toggle(list);
+              } finally {
+                pending.current = false;
+              }
             }}
             style={({ pressed }) => [
               styles.row,

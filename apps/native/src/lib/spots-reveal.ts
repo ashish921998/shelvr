@@ -60,22 +60,36 @@ export function samePin(
 }
 
 export function keptPlaces<
-  Place extends { name: string; lat?: number; lng?: number; appleId?: string },
+  Place extends {
+    name: string;
+    lat?: number;
+    lng?: number;
+    appleId?: string;
+    city?: string;
+  },
 >(places: readonly Place[], removed: readonly RevealPin[]): Place[] {
   return places.filter(
     (place) =>
       !removed.some(
         (pin) =>
           samePin(place, pin) ||
-          (place.lat === undefined && labelOf(place.name, pin.name)),
+          (place.lat === undefined && labelOf(place, pin)),
       ),
   );
 }
 
-function labelOf(label: string, pinName: string): boolean {
-  const place = splitSavedPlace(label.toLowerCase());
-  const pin = splitSavedPlace(pinName.toLowerCase());
-  return place.name === pin.name && (!pin.area || pin.area === place.area);
+function labelOf(
+  entry: { name: string; city?: string },
+  removed: RevealPin,
+): boolean {
+  const place = splitSavedPlace(entry.name.toLowerCase());
+  const pin = splitSavedPlace(removed.name.toLowerCase());
+  if (place.name !== pin.name) return false;
+  if (pin.area) return pin.area === place.area;
+  return (
+    entry.city !== undefined &&
+    (!removed.city || cityKey(entry.city) === cityKey(removed.city))
+  );
 }
 
 export function revealFor(
