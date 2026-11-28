@@ -723,6 +723,32 @@ it("removes every pin a merged reveal row stands for", async () => {
   });
 });
 
+it("removes a pin that joins the row only through another pin's Apple id", async () => {
+  const alpha = { ...uchi, name: "Alpha", appleId: "venue-1" };
+  const beta = { ...uchi, name: "Beta", appleId: "venue-1" };
+  const bare = { ...uchi, name: "Beta", lat: uchi.lat + 0.001 };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [alpha, beta, bare, duck],
+  };
+  mocks.listed = {
+    places: [alpha, beta, bare, duck],
+    version: "v1",
+    ready: true,
+  };
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Alpha")));
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [duck],
+  });
+});
+
 it("follows the save to another city after Edit places moves its places", () => {
   twoSpots();
   const { rerender } = render(<SpotsScreen />);

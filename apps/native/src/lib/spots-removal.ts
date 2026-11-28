@@ -12,8 +12,22 @@ type SpotsExit = "done" | "city" | "fix" | "back";
 
 export type SpotsRemoval = ReturnType<typeof useSpotsRemoval>;
 
-const oneRow = (pin: RevealPin, other: RevealPin) =>
-  uniquePlacePins([pin, other]).length === 1;
+type Row = RevealPin & { members: RevealPin[] };
+
+const rowOf = (pin: RevealPin, pins: RevealPin[]) =>
+  uniquePlacePins<Row>(
+    pins.map((member) => ({ ...member, members: [member] })),
+    (kept, repeat) => ({
+      ...kept,
+      members: [...kept.members, ...repeat.members],
+    }),
+  ).find(
+    (row) =>
+      row.name === pin.name &&
+      row.lat === pin.lat &&
+      row.lng === pin.lng &&
+      row.appleId === pin.appleId,
+  )?.members ?? [pin];
 
 export function useSpotsRemoval(
   itemId: Id<"items">,
@@ -38,6 +52,10 @@ export function useSpotsRemoval(
   const left = useRef(false);
   const unsaved = (pins: RevealPin[]) =>
     pins.filter((pin) => !saved.current.has(pin));
+
+  const shown = found.filter(
+    (pin) => !staged.some((gone) => samePin(pin, gone)),
+  );
 
   useEffect(() => {
     if (!undo) return;
@@ -99,16 +117,13 @@ export function useSpotsRemoval(
   useEffect(() => () => onUnmount.current("back"), []);
 
   return {
-    shown: found.filter((pin) => !staged.some((gone) => samePin(pin, gone))),
+    shown,
     undo,
     remove: (pin: RevealPin) => {
       analytics.capture("share_spots_place_removed", {
         pin_count: found.length,
       });
-      const row = found.filter((other) => oneRow(pin, other));
-      const added = (row.length > 0 ? row : [pin]).filter(
-        (other) => !staged.includes(other),
-      );
+      const added = rowOf(pin, shown);
       undoPins.current = added;
       setStaged((pins) => [...pins, ...added]);
       setUndo(pin);
