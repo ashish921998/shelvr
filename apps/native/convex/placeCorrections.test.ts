@@ -479,6 +479,45 @@ describe("removing places from one save", () => {
       { kind: "open_maps", label: "Tigre", value: "Tigre, Alfama, Porto" },
     ]);
   });
+  it("drops the removed city's map link when a namesake in another city stays", async () => {
+    const { base, t, itemId } = await setup(false);
+    const lisbon = {
+      name: "Tigre, Alfama",
+      city: "Lisbon",
+      lat: 38.71,
+      lng: -9.13,
+    };
+    const porto = {
+      name: "Tigre, Alfama",
+      city: "Porto",
+      lat: 41.15,
+      lng: -8.61,
+    };
+    await base.run((ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Lisbon", "Porto"],
+        places: [lisbon.name],
+        placePins: [lisbon, porto],
+        intents: [
+          { kind: "open_maps", label: "Tigre", value: "Tigre, Alfama, Lisbon" },
+          { kind: "open_maps", label: "Tigre", value: "Tigre, Alfama, Porto" },
+          { kind: "open_maps", label: "Tigre", value: "Tigre, Alfama" },
+        ],
+      }),
+    );
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: data.places.filter((place) => place.city !== "Lisbon"),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.intents?.map((intent) => intent.value)).toEqual([
+      "Tigre, Alfama, Porto",
+      "Tigre, Alfama",
+    ]);
+  });
   it("still needs Pro to add, replace or reorder", async () => {
     const { t, itemId, data } = await twoPlaces(false);
     for (const places of [

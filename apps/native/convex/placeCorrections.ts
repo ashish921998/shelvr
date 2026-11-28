@@ -134,11 +134,11 @@ function removalEdit(
   const names = (place: EditablePlace, name: string) =>
     keyOf(name, place.city) === keyOf(place.name, place.city);
   const removed = current.filter(
-    (place) =>
-      !chosen.some((kept) => samePlace(kept, place)) &&
-      !chosen.some((kept) => names(place, kept.name)),
+    (place) => !chosen.some((kept) => samePlace(kept, place)),
   );
-  const gone = (name: string) => removed.some((place) => names(place, name));
+  const gone = (name: string) =>
+    removed.some((place) => names(place, name)) &&
+    !chosen.some((kept) => names(kept, name));
   return {
     kept: chosen,
     placePins: (visible.placePins ?? []).filter((pin) =>
