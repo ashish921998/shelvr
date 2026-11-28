@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  keptPlaces,
   REVEAL_MAX_WAIT_MS,
   REVEAL_PIN_GRACE_MS,
   revealFor,
@@ -148,5 +149,25 @@ describe("revealFor", () => {
       kind: "none",
       reason: "no_place",
     });
+  });
+});
+
+describe("keptPlaces", () => {
+  const taco = { name: "Taco Bar", lat: 30.27, lng: -97.74, city: "Austin" };
+  const cafe = { name: "Cafe", lat: 30.28, lng: -97.75, appleId: "apple-1" };
+  const listed = [
+    { ...taco, category: "restaurant" },
+    { ...cafe, city: "Austin", name: "Cafe (renamed by Apple)" },
+    { name: "Bakery", city: "Austin" },
+  ];
+
+  it("drops only the removed spots and leaves every other entry untouched, in order", () => {
+    expect(keptPlaces(listed, [taco])).toEqual([listed[1], listed[2]]);
+  });
+  it("matches by Apple id when both sides have one", () => {
+    expect(keptPlaces(listed, [cafe])).toEqual([listed[0], listed[2]]);
+  });
+  it("keeps a namesake at other coordinates", () => {
+    expect(keptPlaces(listed, [{ ...taco, lat: 31 }])).toEqual(listed);
   });
 });

@@ -15,6 +15,7 @@ import {
   removalsSince,
   visibleSave,
 } from "./model/placeRemovals";
+import { placeKey, splitSavedPlace } from "./model/plan";
 import { buildSearchText } from "./model/searchText";
 import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
@@ -91,21 +92,75 @@ function cleanPlace(place: EditablePlace): EditablePlace {
   return { ...place, name, ...(city ? { city } : {}) };
 }
 
+function samePlace(place: EditablePlace, other: EditablePlace): boolean {
+  return (
+    place.name === other.name &&
+    place.city === other.city &&
+    place.lat === other.lat &&
+    place.lng === other.lng &&
+    place.appleId === other.appleId &&
+    place.category === other.category
+  );
+}
+
 function samePlaces(left: EditablePlace[], right: EditablePlace[]): boolean {
   return (
     left.length === right.length &&
-    left.every((place, index) => {
-      const other = right[index];
-      return (
-        place.name === other.name &&
-        place.city === other.city &&
-        place.lat === other.lat &&
-        place.lng === other.lng &&
-        place.appleId === other.appleId &&
-        place.category === other.category
-      );
-    })
+    left.every((place, index) => samePlace(place, right[index]))
   );
+}
+
+function onlyRemoves(
+  chosen: EditablePlace[],
+  current: EditablePlace[],
+): boolean {
+  let at = 0;
+  return chosen.every((place) => {
+    while (at < current.length && !samePlace(place, current[at])) at++;
+    return at++ < current.length;
+  });
+}
+
+function venueOf(label: string): string {
+  const { name } = splitSavedPlace(label);
+  return placeKey(name) || name.toLowerCase();
+}
+
+function removalEdit(
+  visible: Doc<"items">,
+  chosen: EditablePlace[],
+  current: EditablePlace[],
+) {
+  const pinned = new Set(
+    chosen.flatMap((place) =>
+      place.lat === undefined ? [] : [venueOf(place.name)],
+    ),
+  );
+  const removed = new Set(
+    current
+      .filter((place) => !chosen.some((kept) => samePlace(kept, place)))
+      .map((place) => venueOf(place.name))
+      .filter((venue) => !pinned.has(venue)),
+  );
+  const gone = (name: string) => removed.has(venueOf(name));
+  const kept = chosen.filter(
+    (place) => place.lat !== undefined || !gone(place.name),
+  );
+  return {
+    kept,
+    placePins: (visible.placePins ?? []).filter((pin) =>
+      kept.some(
+        (place) =>
+          place.name === pin.name &&
+          place.lat === pin.lat &&
+          place.lng === pin.lng,
+      ),
+    ),
+    placeCuisines: visible.placeCuisines?.filter((row) => !gone(row.name)),
+    intents: visible.intents?.filter(
+      (intent) => intent.kind !== "open_maps" || !gone(intent.value),
+    ),
+  };
 }
 
 export const savePlaces = authedMutation({
@@ -118,18 +173,23 @@ export const savePlaces = authedMutation({
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (!item || item.userId !== ctx.userId) throw new Error("Save not found");
-    await requireProEntitlement(ctx, ctx.userId);
     const removals = await ctx.db
       .query("placeRemovals")
       .withIndex("by_user", (q) => q.eq("userId", ctx.userId))
       .collect();
-    const current = currentPlaces(await visibleSave(ctx, item, removals));
+    const visible = await visibleSave(ctx, item, removals);
+    const current = currentPlaces(visible);
     if (item.status !== "ready" || JSON.stringify(current) !== args.version)
       throw new Error("Places changed; reopen this save");
     if (args.places.length > MAX_ITEM_PLACES)
       throw new Error("Too many places");
+    const requested = args.places.map(cleanPlace);
+    const removeOnly = onlyRemoves(requested, current)
+      ? removalEdit(visible, requested, current)
+      : null;
+    if (!removeOnly) await requireProEntitlement(ctx, ctx.userId);
     await rateLimiter.limit(ctx, "tripEdit", { key: ctx.userId, throws: true });
-    const chosen = args.places.map(cleanPlace);
+    const chosen = removeOnly?.kept ?? requested;
     if (samePlaces(chosen, current)) return null;
     const cities = normalizeCities(
       chosen.flatMap((place) =>
@@ -138,11 +198,13 @@ export const savePlaces = authedMutation({
     );
     const places = [...new Set(chosen.map((place) => place.name))];
     const unpinned = chosen.filter((place) => place.lat === undefined);
-    const placePins = chosen.flatMap((place) =>
-      place.lat !== undefined && place.lng !== undefined
-        ? [{ ...place, lat: place.lat, lng: place.lng }]
-        : [],
-    );
+    const placePins =
+      removeOnly?.placePins ??
+      chosen.flatMap((place) =>
+        place.lat !== undefined && place.lng !== undefined
+          ? [{ ...place, lat: place.lat, lng: place.lng }]
+          : [],
+      );
     const patch = {
       cities,
       places,
@@ -153,8 +215,10 @@ export const savePlaces = authedMutation({
         unpinned.map(({ name }) => name),
         cities,
       ),
-      placeCuisines: undefined,
-      intents: item.intents?.filter((intent) => intent.kind !== "open_maps"),
+      placeCuisines: removeOnly ? removeOnly.placeCuisines : undefined,
+      intents: removeOnly
+        ? removeOnly.intents
+        : item.intents?.filter((intent) => intent.kind !== "open_maps"),
     };
     await ctx.db.patch(item._id, {
       ...patch,

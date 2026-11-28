@@ -1058,6 +1058,9 @@
     "other": "%{formattedCount} spots from this save"
   },
   "spots.openCity": "Open %{city}",
+  "spots.removePlace": "Remove %{name} from this save",
+  "spots.noneLeft": "No places left in this save",
+  "spots.fixPlaces": "Wrong or missing a place?",
   "placeCategory.restaurant": "Restaurant",
   "placeCategory.foodMarket": "Food market",
   "placeCategory.cafe": "Café",

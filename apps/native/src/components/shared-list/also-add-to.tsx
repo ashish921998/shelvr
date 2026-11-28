@@ -20,10 +20,12 @@ export function AlsoAddTo({
   itemId,
   city,
   count,
+  beforeToggle,
 }: {
   itemId: Id<"items">;
   city: string;
   count: number;
+  beforeToggle?: () => Promise<void>;
 }) {
   const { theme } = useUnistyles();
   const reduced = useLiveReducedMotion();
@@ -53,7 +55,10 @@ export function AlsoAddTo({
             accessibilityLabel={`${list.name}, ${line}`}
             accessibilityState={{ checked: on, busy, disabled: busy }}
             disabled={busy}
-            onPress={() => void toggle(list)}
+            onPress={async () => {
+              await beforeToggle?.();
+              await toggle(list);
+            }}
             style={({ pressed }) => [
               styles.row,
               on && styles.on,

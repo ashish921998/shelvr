@@ -4,7 +4,7 @@ import { cityKey } from "@convex/model/trip";
 export const REVEAL_MAX_WAIT_MS = 25_000;
 export const REVEAL_PIN_GRACE_MS = 10_000;
 
-type RevealPin = {
+export type RevealPin = {
   name: string;
   lat: number;
   lng: number;
@@ -40,6 +40,31 @@ function revealCity(save: RevealSave, pins: RevealPin[]): string | null {
   return best?.name ?? save.cities?.[0] ?? null;
 }
 
+export function pinsIn(save: RevealSave, city: string): RevealPin[] {
+  const key = cityKey(city);
+  const single = (save.cities ?? []).length <= 1;
+  return (save.placePins ?? []).filter(
+    (pin) =>
+      !isStreetAddress(pin.name) &&
+      (pin.city ? cityKey(pin.city) === key : single),
+  );
+}
+
+export function samePin(
+  pin: { name: string; lat?: number; lng?: number; appleId?: string },
+  other: RevealPin,
+): boolean {
+  return pin.appleId && other.appleId
+    ? pin.appleId === other.appleId
+    : pin.name === other.name && pin.lat === other.lat && pin.lng === other.lng;
+}
+
+export function keptPlaces<
+  Place extends { name: string; lat?: number; lng?: number; appleId?: string },
+>(places: readonly Place[], removed: readonly RevealPin[]): Place[] {
+  return places.filter((place) => !removed.some((pin) => samePin(place, pin)));
+}
+
 export function revealFor(
   save: RevealSave | null | undefined,
   waitedMs: number,
@@ -58,11 +83,7 @@ export function revealFor(
         ? revealCity(save, pins)
         : null;
     if (city !== null) {
-      const key = cityKey(city);
-      const single = (save.cities ?? []).length <= 1;
-      const here = pins.filter((pin) =>
-        pin.city ? cityKey(pin.city) === key : single,
-      );
+      const here = pinsIn(save, city);
       if (here.length > 0) return { kind: "spots", city, pins: here };
     }
     if (save.status === "ready") {

@@ -1086,6 +1086,9 @@
     "other": "%{formattedCount} lugares deste salvo"
   },
   "spots.openCity": "Abrir %{city}",
+  "spots.removePlace": "Remover %{name} deste salvo",
+  "spots.noneLeft": "Nenhum lugar restante neste salvo",
+  "spots.fixPlaces": "Algum lugar errado ou faltando?",
   "placeCategory.restaurant": "Restaurante",
   "placeCategory.foodMarket": "Mercado",
   "placeCategory.cafe": "Café",

@@ -1086,6 +1086,9 @@
     "other": "%{formattedCount} lugares de este guardado"
   },
   "spots.openCity": "Abrir %{city}",
+  "spots.removePlace": "Quitar %{name} de este guardado",
+  "spots.noneLeft": "No quedan lugares en este guardado",
+  "spots.fixPlaces": "¿Algún lugar está mal o falta?",
   "placeCategory.restaurant": "Restaurante",
   "placeCategory.foodMarket": "Mercado",
   "placeCategory.cafe": "Cafetería",

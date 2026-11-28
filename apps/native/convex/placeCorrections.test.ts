@@ -323,12 +323,129 @@ describe("place corrections", () => {
         caller.mutation(api.placeCorrections.savePlaces, {
           itemId,
           version: data.version,
-          places: [],
+          places: [...data.places, { name: "Cafe", city: "Lisbon" }],
         }),
       ).rejects.toThrow();
       await expect(
         caller.mutation(internal.placeCorrections.claimSearch, { itemId }),
       ).rejects.toThrow();
+    }
+  });
+});
+
+describe("removing places from one save", () => {
+  const second = { name: "Bakery", city: "Lisbon", lat: 38.72, lng: -9.15 };
+  async function twoPlaces(pro: boolean) {
+    const ready = await setup(pro);
+    await ready.base.run((ctx) =>
+      ctx.db.patch(ready.itemId, {
+        places: [original.name, second.name, `${second.name}, Chiado`],
+        placePins: [
+          { ...original, cuisine: "burger" },
+          { ...second, cuisine: "bakery" },
+        ],
+        placeCuisines: [
+          { name: original.name, cuisine: "burger" },
+          { name: second.name, cuisine: "bakery" },
+        ],
+        intents: [
+          { kind: "open_maps", label: "Old", value: original.name },
+          { kind: "open_maps", label: "Bakery", value: second.name },
+          { kind: "copy", label: "Code", value: "SAVE10" },
+        ],
+      }),
+    );
+    const data = await ready.t.query(api.placeCorrections.getPlaces, {
+      itemId: ready.itemId,
+    });
+    if (!data) throw new Error("Missing save");
+    return { ...ready, data };
+  }
+  const without = (places: { name: string }[], name: string) =>
+    places.filter((place) => place.name !== name);
+
+  it("lets a free user remove a place and keeps what the save knew about the rest", async () => {
+    const { base, t, itemId, data } = await twoPlaces(false);
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, second.name),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({
+      placesEdited: true,
+      places: [original.name],
+      placePins: [{ ...original, cuisine: "burger" }],
+      placeCuisines: [{ name: original.name, cuisine: "burger" }],
+      intents: [
+        { kind: "open_maps", label: "Old", value: original.name },
+        { kind: "copy", label: "Code", value: "SAVE10" },
+      ],
+    });
+    const jobs = await base.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(jobs.map((job) => job.name)).not.toContain("placePins:locateItem");
+  });
+  it("does not let a later lookup bring a removed place back", async () => {
+    const { base, t, userId, itemId, data } = await twoPlaces(false);
+    await base.run(async (ctx) => {
+      const spaceId = await ctx.db.insert("spaces", { userId, name: "Lisbon" });
+      await ctx.db.insert("spaceItems", {
+        userId,
+        spaceId,
+        itemId,
+        status: "saved",
+        intents: [{ kind: "open_maps", label: "Bakery", value: second.name }],
+      });
+    });
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, second.name),
+    });
+    await storeCurrentPins(base, { itemId, found: [second] });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.placePins?.map((pin) => pin.name)).toEqual([original.name]);
+  });
+  it("keeps places whose names have no letters apart from each other", async () => {
+    const { base, t, itemId } = await setup(false);
+    const pins = [
+      { name: "🍕", city: "Lisbon", lat: 38.71, lng: -9.14 },
+      { name: "☕", city: "Lisbon", lat: 38.72, lng: -9.15 },
+    ];
+    await base.run((ctx) =>
+      ctx.db.patch(itemId, {
+        places: pins.map((pin) => pin.name),
+        placePins: [pins[0]],
+        placeCuisines: [{ name: "☕", cuisine: "coffee" }],
+      }),
+    );
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, "🍕"),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.places).toEqual(["☕"]);
+    expect(item?.placeCuisines).toEqual([{ name: "☕", cuisine: "coffee" }]);
+  });
+  it("still needs Pro to add, replace or reorder", async () => {
+    const { t, itemId, data } = await twoPlaces(false);
+    for (const places of [
+      [...data.places, { name: "Cafe", city: "Lisbon" }],
+      [{ ...data.places[0], name: "Renamed" }, ...data.places.slice(1)],
+      [...data.places].reverse(),
+    ]) {
+      await expect(
+        t.mutation(api.placeCorrections.savePlaces, {
+          itemId,
+          version: data.version,
+          places,
+        }),
+      ).rejects.toThrow(/pro_required/);
     }
   });
 });

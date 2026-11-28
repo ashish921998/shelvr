@@ -336,6 +336,14 @@ export type AnalyticsEventProperties = {
     waited_ms: number;
   };
   share_spots_city_opened: { pin_count: number };
+  share_spots_place_removed: { pin_count: number };
+  share_spots_place_restored: { pin_count: number };
+  share_spots_fix_opened: { pin_count: number; staged_removals: number };
+  share_spots_left: {
+    pin_count: number;
+    removed: number;
+    via: "done" | "city" | "fix" | "back";
+  };
   shared_list_created: { cities: number };
   shared_list_invite_sent: { shared: boolean; surface: "new" | "list" };
   shared_list_join_tapped: { signed_in: boolean };

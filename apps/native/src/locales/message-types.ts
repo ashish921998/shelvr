@@ -975,6 +975,9 @@ type MessageParams = {
   "spots.addedTo": { city: string };
   "spots.count": { count: number };
   "spots.openCity": { city: string };
+  "spots.removePlace": { name: string };
+  "spots.noneLeft": undefined;
+  "spots.fixPlaces": undefined;
   "placeCategory.restaurant": undefined;
   "placeCategory.foodMarket": undefined;
   "placeCategory.cafe": undefined;
