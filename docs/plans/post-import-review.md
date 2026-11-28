@@ -97,7 +97,9 @@ When the new list is the current list with places removed (same order, no add, n
   for a removed pin ("Lucy's, Montrose" after removing the pin "Lucy's"), or `locateItem` would
   look it up again. It matches the name, and the area when the pin has one, so removing
   "Joe's, Carmine St" keeps "Joe's, Broadway". When the pin has no area, the label must be in
-  the pin's city, so a multi-city save keeps "Taco Bar, Dallas". Also add to writes these removals
+  the pin's city, so a multi-city save keeps "Taco Bar, Dallas", and labels naming more than one
+  area all stay: removing the pin "Joe's" keeps both "Joe's, Carmine St" and "Joe's, Broadway".
+  A kept label stays unpinned, so a later lookup may pin the removed spot again under it. Also add to writes these removals
   before a toggle and skips the toggle if the write fails.
 
 **Free users may remove, not add.** Saving is free under `FREE_SAVES_ENABLED`, but every correction
