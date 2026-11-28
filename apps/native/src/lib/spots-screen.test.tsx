@@ -674,3 +674,19 @@ it("keeps a list tick waiting until a spot removed during its write is saved too
     places: [duck, bakery],
   });
 });
+
+it("shows a spot again when Edit places adds back one the reveal removed", async () => {
+  twoSpots();
+  const { rerender } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  await flush();
+  expect(mocks.push).toHaveBeenCalled();
+  mocks.save = { ...mocks.save!, placePins: [uchi] };
+  rerender(<SpotsScreen />);
+  mocks.save = { ...mocks.save, placePins: [uchi, duck] };
+  rerender(<SpotsScreen />);
+  expect(screen.getByText("Odd Duck")).toBeTruthy();
+  expect(screen.getByText('spots.count {"count":2}')).toBeTruthy();
+});

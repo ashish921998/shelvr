@@ -28,9 +28,11 @@ export function useSpotsRemoval(
   useEffect(() => {
     latest.current = { listed, staged, revealed, count: found.length };
   });
-  const written = useRef(0);
+  const saved = useRef(new Set<RevealPin>());
   const queue = useRef(Promise.resolve(true));
   const left = useRef(false);
+  const unsaved = (pins: RevealPin[]) =>
+    pins.filter((pin) => !saved.current.has(pin));
 
   useEffect(() => {
     if (!undo) return;
@@ -38,11 +40,7 @@ export function useSpotsRemoval(
     return () => clearTimeout(timer);
   }, [undo]);
 
-  const persistOnce = async () => {
-    const from = written.current;
-    const pending = latest.current.staged.slice(from);
-    if (pending.length === 0) return true;
-    written.current = latest.current.staged.length;
+  const persistOnce = async (pending: RevealPin[]) => {
     setUndo(null);
     let failure: unknown = null;
     for (const fresh of [false, true]) {
@@ -56,18 +54,23 @@ export function useSpotsRemoval(
           version: data.version,
           places: keptPlaces(data.places, pending),
         });
+        for (const pin of pending) saved.current.add(pin);
+        setStaged((pins) => pins.filter((pin) => !pending.includes(pin)));
         return true;
       } catch (error) {
         failure = error;
       }
     }
-    written.current = Math.min(written.current, from);
     analytics.captureError("spots_removal_failed", failure);
     return false;
   };
   const persist = async () => {
-    while (latest.current.staged.length > written.current) {
-      if (!(await persistOnce())) return false;
+    for (
+      let pending = unsaved(latest.current.staged);
+      pending.length > 0;
+      pending = unsaved(latest.current.staged)
+    ) {
+      if (!(await persistOnce(pending))) return false;
     }
     return true;
   };
@@ -78,7 +81,7 @@ export function useSpotsRemoval(
       left.current = true;
       analytics.capture("share_spots_left", {
         pin_count: latest.current.count,
-        removed: latest.current.staged.length,
+        removed: saved.current.size + unsaved(latest.current.staged).length,
         via,
       });
     }
@@ -111,7 +114,7 @@ export function useSpotsRemoval(
     fix: async () => {
       analytics.capture("share_spots_fix_opened", {
         pin_count: found.length,
-        staged_removals: staged.length - written.current,
+        staged_removals: unsaved(staged).length,
       });
       await write();
     },
