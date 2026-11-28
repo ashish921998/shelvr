@@ -186,4 +186,8 @@ describe("keptPlaces", () => {
     const places = [taco, { name: "Taco Bar, Dallas" }];
     expect(keptPlaces(places, [taco])).toEqual([places[1]]);
   });
+  it("drops a label naming the removed spot's city in a multi-city save", () => {
+    const places = [taco, { name: "Taco Bar, Austin" }, { name: "Taco Bar" }];
+    expect(keptPlaces(places, [taco])).toEqual([places[2]]);
+  });
 });

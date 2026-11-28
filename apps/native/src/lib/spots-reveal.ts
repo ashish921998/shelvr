@@ -86,10 +86,10 @@ function labelOf(
   const pin = splitSavedPlace(removed.name.toLowerCase());
   if (place.name !== pin.name) return false;
   if (pin.area) return pin.area === place.area;
-  return (
-    entry.city !== undefined &&
-    (!removed.city || cityKey(entry.city) === cityKey(removed.city))
-  );
+  const inPinCity = (city: string | undefined) =>
+    city !== undefined &&
+    (!removed.city || cityKey(city) === cityKey(removed.city));
+  return inPinCity(entry.city) || (!!removed.city && inPinCity(place.area));
 }
 
 export function revealFor(
