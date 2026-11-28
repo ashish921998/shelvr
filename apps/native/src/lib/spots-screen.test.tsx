@@ -597,6 +597,43 @@ it("writes removals before Edit places and opens it through the Pro gate", async
   });
 });
 
+it("does not open Edit places over Done once its write finishes", async () => {
+  twoSpots();
+  let finish = () => {};
+  mocks.savePlaces.mockReturnValueOnce(
+    new Promise<null>((resolve) => (finish = () => resolve(null))),
+  );
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  fireEvent.click(screen.getByText("common.done"));
+  await act(async () => finish());
+  await flush();
+  expect(mocks.replace).toHaveBeenCalledOnce();
+  expect(mocks.admit).not.toHaveBeenCalled();
+  expect(mocks.push).not.toHaveBeenCalled();
+  expect(
+    mocks.capture.mock.calls.filter(
+      ([name]) => name === "share_spots_fix_opened",
+    ),
+  ).toHaveLength(1);
+});
+
+it("opens Edit places once for a double tap, and again on a later tap", async () => {
+  twoSpots();
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  await flush();
+  expect(mocks.push).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  await flush();
+  expect(mocks.push).toHaveBeenCalledTimes(2);
+});
+
 it("stays on the reveal when the Pro gate does not let Edit places open", async () => {
   twoSpots();
   mocks.admit.mockResolvedValue("paywalled");

@@ -139,21 +139,38 @@ function Spots({
   const settled = dropped >= pins.length;
   const mapHeight = rt.screen.height * MAP_SHARE;
   const mapParams = { city, save: save._id };
+  const away = useRef(false);
+  const fixing = useRef(false);
+  useEffect(() => {
+    away.current = false;
+    return () => {
+      away.current = true;
+    };
+  }, []);
   const done = () => {
+    away.current = true;
     removal.leave("done");
     router.replace({ pathname: "/(app)/(tabs)/(map)", params: mapParams });
   };
   const fixPlaces = async () => {
-    await removal.fix();
-    if ((await editGate.admit()) !== "go") return;
-    editGate.passed();
-    removal.leave("fix");
-    router.push({
-      pathname: "/edit-save-places",
-      params: { itemId: save._id },
-    });
+    if (fixing.current) return;
+    fixing.current = true;
+    try {
+      await removal.fix();
+      if (away.current || (await editGate.admit()) !== "go" || away.current)
+        return;
+      editGate.passed();
+      removal.leave("fix");
+      router.push({
+        pathname: "/edit-save-places",
+        params: { itemId: save._id },
+      });
+    } finally {
+      fixing.current = false;
+    }
   };
   const openCity = () => {
+    away.current = true;
     removal.leave("city");
     analytics.capture("share_spots_city_opened", { pin_count: pins.length });
     router.dismissTo({ pathname: "/(app)/(tabs)/(map)", params: mapParams });
