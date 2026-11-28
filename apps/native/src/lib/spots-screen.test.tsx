@@ -749,6 +749,32 @@ it("removes a pin that joins the row only through another pin's Apple id", async
   });
 });
 
+it("keeps the venue whose row a removed neighbour of the same name did not join", async () => {
+  const bare = { ...uchi };
+  const first = { ...uchi, appleId: "venue-a" };
+  const second = { ...uchi, appleId: "venue-b", lat: uchi.lat + 0.001 };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [bare, first, second, duck],
+  };
+  mocks.listed = {
+    places: [bare, first, second, duck],
+    version: "v1",
+    ready: true,
+  };
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getAllByLabelText(removeLabel("Uchi"))[1]);
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [bare, first, duck],
+  });
+});
+
 it("follows the save to another city after Edit places moves its places", () => {
   twoSpots();
   const { rerender } = render(<SpotsScreen />);
