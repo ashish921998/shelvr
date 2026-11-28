@@ -55,7 +55,7 @@ export function samePin(
   pin: { name: string; lat?: number; lng?: number; appleId?: string },
   other: RevealPin,
 ): boolean {
-  return pin.appleId && other.appleId
+  return pin.appleId || other.appleId
     ? pin.appleId === other.appleId
     : pin.name === other.name && pin.lat === other.lat && pin.lng === other.lng;
 }
