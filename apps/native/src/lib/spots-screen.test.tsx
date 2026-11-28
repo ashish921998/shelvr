@@ -802,6 +802,30 @@ it("keeps another venue at the same name and point as a removed pin with no Appl
   });
 });
 
+it("keeps a removed pin removed after its Apple id lands", async () => {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [uchi, duck],
+  };
+  mocks.listed = { places: [uchi, duck], version: "v1", ready: true };
+  const { rerender, unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  const identified = { ...uchi, appleId: "venue-a" };
+  mocks.save = { ...mocks.save, placePins: [identified, duck] };
+  mocks.listed = { places: [identified, duck], version: "v2", ready: true };
+  rerender(<SpotsScreen />);
+  expect(screen.queryByText("Uchi")).toBeNull();
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v2",
+    places: [duck],
+  });
+});
+
 it("follows the save to another city after Edit places moves its places", () => {
   twoSpots();
   const { rerender } = render(<SpotsScreen />);

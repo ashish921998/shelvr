@@ -14,6 +14,8 @@ export type RevealPin = {
   category?: string;
 };
 
+export type StagedPin = RevealPin & { otherVenues?: string[] };
+
 export type RevealSave = {
   _id: string;
   status: string;
@@ -53,11 +55,15 @@ export function pinsIn(save: RevealSave, city: string): RevealPin[] {
 
 export function samePin(
   pin: { name: string; lat?: number; lng?: number; appleId?: string },
-  other: RevealPin,
+  removed: StagedPin,
 ): boolean {
-  return pin.appleId || other.appleId
-    ? pin.appleId === other.appleId
-    : pin.name === other.name && pin.lat === other.lat && pin.lng === other.lng;
+  if (removed.appleId) return pin.appleId === removed.appleId;
+  return (
+    pin.name === removed.name &&
+    pin.lat === removed.lat &&
+    pin.lng === removed.lng &&
+    !(pin.appleId && removed.otherVenues?.includes(pin.appleId))
+  );
 }
 
 export function keptPlaces<
@@ -68,7 +74,7 @@ export function keptPlaces<
     appleId?: string;
     city?: string;
   },
->(places: readonly Place[], removed: readonly RevealPin[]): Place[] {
+>(places: readonly Place[], removed: readonly StagedPin[]): Place[] {
   return places.filter(
     (place) =>
       !removed.some(

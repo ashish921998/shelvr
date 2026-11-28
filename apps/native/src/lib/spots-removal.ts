@@ -1,5 +1,10 @@
 import { analytics } from "@/lib/analytics";
-import { keptPlaces, type RevealPin, samePin } from "@/lib/spots-reveal";
+import {
+  keptPlaces,
+  type RevealPin,
+  samePin,
+  type StagedPin,
+} from "@/lib/spots-reveal";
 import { api } from "@convex/_generated/api";
 import { uniquePlacePins } from "@convex/model/trip";
 import type { Id } from "@convex/_generated/dataModel";
@@ -40,19 +45,28 @@ export function useSpotsRemoval(
     revealed ? { itemId } : "skip",
   );
   const savePlaces = useMutation(api.placeCorrections.savePlaces);
-  const [staged, setStaged] = useState<RevealPin[]>([]);
+  const [staged, setStaged] = useState<StagedPin[]>([]);
   const [undo, setUndo] = useState<RevealPin | null>(null);
-  const undoPins = useRef<RevealPin[]>([]);
+  const undoPins = useRef<StagedPin[]>([]);
   const latest = useRef({ listed, staged, revealed, count: found.length });
   useEffect(() => {
     latest.current = { listed, staged, revealed, count: found.length };
   });
-  const saved = useRef(new Set<RevealPin>());
+  const saved = useRef(new Set<StagedPin>());
   const queue = useRef(Promise.resolve(true));
   const left = useRef(false);
-  const unsaved = (pins: RevealPin[]) =>
+  const unsaved = (pins: StagedPin[]) =>
     pins.filter((pin) => !saved.current.has(pin));
 
+  const venuesAt = (pin: RevealPin) =>
+    found.flatMap((other) =>
+      other.appleId &&
+      other.name === pin.name &&
+      other.lat === pin.lat &&
+      other.lng === pin.lng
+        ? [other.appleId]
+        : [],
+    );
   const shown = found.filter(
     (pin) => !staged.some((gone) => samePin(pin, gone)),
   );
@@ -63,7 +77,7 @@ export function useSpotsRemoval(
     return () => clearTimeout(timer);
   }, [undo]);
 
-  const persistOnce = async (pending: RevealPin[]) => {
+  const persistOnce = async (pending: StagedPin[]) => {
     setUndo(null);
     let failure: unknown = null;
     for (const fresh of [false, true]) {
@@ -123,7 +137,9 @@ export function useSpotsRemoval(
       analytics.capture("share_spots_place_removed", {
         pin_count: found.length,
       });
-      const added = rowOf(pin, shown);
+      const added = rowOf(pin, shown).map((member) =>
+        member.appleId ? member : { ...member, otherVenues: venuesAt(member) },
+      );
       undoPins.current = added;
       setStaged((pins) => [...pins, ...added]);
       setUndo(pin);
