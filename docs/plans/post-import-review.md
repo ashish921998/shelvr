@@ -162,7 +162,9 @@ involved.
 - **The list changes before the write.** `savePlaces` rejects a stale `version` ("Places changed;
   reopen this save"). The reveal subscribes to `api.placeCorrections.getPlaces` for `version`. On
   leaving, it applies the staged removals to the latest list and writes once. If the write still
-  hits a mismatch, it retries once against a fresh list, then gives up with
+  hits a mismatch, it retries once against a list whose version differs from the rejected one.
+  The client's `query()` would return the subscription's cached copy, so the retry watches the
+  query and waits up to 3 s for the newer version, then gives up with
   `captureError("spots_removal_failed")`. It never blocks navigation.
 - **A pin lands after the write.** `storePins` is guarded by its own version (run id plus cities,
   `convex/placePins.ts:199`), and it keeps only wanted places (`wantedPlaces`, `placePins.ts:150`).

@@ -55,7 +55,34 @@ vi.mock("@/lib/analytics", () => ({
 vi.mock("convex/react", () => ({
   useQuery: () => mocks.listed,
   useMutation: () => mocks.savePlaces,
-  useConvex: () => ({ query: mocks.freshPlaces }),
+  useConvex: () => ({
+    query: () => Promise.resolve(mocks.listed ?? mocks.freshPlaces()),
+    watchQuery: () => {
+      let read = () => mocks.listed;
+      return {
+        localQueryResult: () => read(),
+        onUpdate: (update: () => void) => {
+          let live = true;
+          Promise.resolve()
+            .then(() => mocks.freshPlaces())
+            .then(
+              (data) => {
+                read = () => data;
+              },
+              (error) => {
+                read = () => {
+                  throw error;
+                };
+              },
+            )
+            .then(() => live && update());
+          return () => {
+            live = false;
+          };
+        },
+      };
+    },
+  }),
 }));
 vi.mock("@/lib/pro-gate", () => ({
   useProGate: () => ({ admit: mocks.admit, passed: mocks.passed }),
@@ -491,6 +518,25 @@ it("retries once against a fresh list, then reports a failed write", async () =>
   cleanup();
   await flush();
   await flush();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "spots_removal_failed",
+    expect.any(Error),
+  );
+});
+
+it("gives up when no list newer than the rejected one arrives", async () => {
+  vi.useFakeTimers();
+  twoSpots();
+  mocks.savePlaces.mockRejectedValue(new Error("Places changed"));
+  mocks.freshPlaces.mockImplementation(() => mocks.listed);
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  cleanup();
+  await act(() => vi.advanceTimersByTimeAsync(2900));
+  expect(mocks.savePlaces).toHaveBeenCalledOnce();
+  expect(mocks.captureError).not.toHaveBeenCalled();
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mocks.savePlaces).toHaveBeenCalledOnce();
   expect(mocks.captureError).toHaveBeenCalledWith(
     "spots_removal_failed",
     expect.any(Error),

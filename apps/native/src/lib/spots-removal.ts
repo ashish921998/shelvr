@@ -12,6 +12,7 @@ import { useConvex, useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 
 const UNDO_MS = 6000;
+const NEWER_LIST_MS = 3000;
 
 type SpotsExit = "done" | "city" | "fix" | "back";
 
@@ -77,15 +78,43 @@ export function useSpotsRemoval(
     return () => clearTimeout(timer);
   }, [undo]);
 
+  const newerList = (rejected: string | undefined) =>
+    new Promise<typeof listed | null>((resolve, reject) => {
+      const watch = convex.watchQuery(api.placeCorrections.getPlaces, {
+        itemId,
+      });
+      let stop = () => {};
+      const timer = setTimeout(
+        () => settle(() => resolve(null)),
+        NEWER_LIST_MS,
+      );
+      const settle = (end: () => void) => {
+        clearTimeout(timer);
+        stop();
+        end();
+      };
+      const read = () => {
+        try {
+          const data = watch.localQueryResult();
+          if (data !== undefined && data?.version !== rejected)
+            settle(() => resolve(data));
+        } catch (error) {
+          settle(() => reject(error));
+        }
+      };
+      stop = watch.onUpdate(read);
+      read();
+    });
+
   const persistOnce = async (pending: StagedPin[]) => {
     setUndo(null);
     let failure: unknown = null;
+    let rejected: string | undefined;
     for (const fresh of [false, true]) {
       try {
-        const data = fresh
-          ? await convex.query(api.placeCorrections.getPlaces, { itemId })
-          : latest.current.listed;
+        const data = fresh ? await newerList(rejected) : latest.current.listed;
         if (!data) continue;
+        rejected = data.version;
         await savePlaces({
           itemId,
           version: data.version,
