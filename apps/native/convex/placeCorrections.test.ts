@@ -538,6 +538,60 @@ describe("removing places from one save", () => {
     const item = await base.run((ctx) => ctx.db.get(itemId));
     expect(item?.placePins).toEqual([second]);
   });
+  it("keeps a place hidden across the account when another place is removed", async () => {
+    const { base, t, userId, itemId } = await twoPlaces(false);
+    await base.run((ctx) =>
+      ctx.db.insert("placeRemovals", {
+        userId,
+        name: original.name,
+        city: original.city,
+        lat: original.lat,
+        lng: original.lng,
+      }),
+    );
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    expect(data.places.map((place) => place.name)).not.toContain(original.name);
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: without(data.places, second.name, label),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item).toMatchObject({
+      places: [original.name],
+      placePins: [{ ...original, cuisine: "burger" }],
+      placeCuisines: [{ name: original.name, cuisine: "burger" }],
+      intents: [
+        { kind: "open_maps", label: "Old", value: original.name },
+        { kind: "copy", label: "Code", value: "SAVE10" },
+      ],
+    });
+    const rows = await base.run((ctx) =>
+      ctx.db.query("placeRemovals").collect(),
+    );
+    expect(rows).toHaveLength(1);
+  });
+  it("drops the pin of a removed row that differs from a kept one only by category", async () => {
+    const { base, t, itemId } = await setup(false);
+    const cafe = { ...original, category: "cafe" };
+    const bar = { ...original, category: "bar" };
+    await base.run((ctx) =>
+      ctx.db.patch(itemId, {
+        places: [original.name],
+        placePins: [cafe, bar],
+      }),
+    );
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: data.places.filter((place) => place.category === "bar"),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.placePins).toEqual([bar]);
+  });
   it("still needs Pro to add, replace or reorder", async () => {
     const { t, itemId, data } = await twoPlaces(false);
     for (const places of [

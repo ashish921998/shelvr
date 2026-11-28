@@ -111,21 +111,26 @@ function samePlaces(left: EditablePlace[], right: EditablePlace[]): boolean {
   );
 }
 
-function onlyRemoves(
+function keptPositions(
   chosen: EditablePlace[],
   current: EditablePlace[],
-): boolean {
+): Set<number> | null {
+  const kept = new Set<number>();
   let at = 0;
-  return chosen.every((place) => {
+  for (const place of chosen) {
     while (at < current.length && !samePlace(place, current[at])) at++;
-    return at++ < current.length;
-  });
+    if (at === current.length) return null;
+    kept.add(at++);
+  }
+  return kept;
 }
 
 function removalEdit(
+  item: Doc<"items">,
   visible: Doc<"items">,
   chosen: EditablePlace[],
   current: EditablePlace[],
+  kept: Set<number>,
 ) {
   const keyOf = (name: string, city: string | undefined) => {
     const bare = (city && withoutCitySuffix(name, city)) || name;
@@ -133,26 +138,30 @@ function removalEdit(
   };
   const names = (place: EditablePlace, name: string) =>
     keyOf(name, place.city) === keyOf(place.name, place.city);
-  const removed = current.filter(
-    (place) => !chosen.some((kept) => samePlace(kept, place)),
-  );
+  const removed = current.filter((_, index) => !kept.has(index));
   const gone = (name: string) =>
     removed.some((place) => names(place, name)) &&
     !chosen.some((kept) => names(kept, name));
+  const shownPins = visible.placePins ?? [];
+  const removedPins = shownPins.filter((_, index) => !kept.has(index));
+  const shownIntents = visible.intents ?? [];
   return {
     kept: chosen,
-    placePins: (visible.placePins ?? []).filter((pin) =>
-      chosen.some(
-        (place) =>
-          place.name === pin.name &&
-          place.lat === pin.lat &&
-          place.lng === pin.lng &&
-          place.appleId === pin.appleId,
-      ),
+    placePins: (item.placePins ?? []).filter(
+      (pin) => !removedPins.includes(pin),
     ),
-    placeCuisines: visible.placeCuisines?.filter((row) => !gone(row.name)),
-    intents: visible.intents?.filter(
-      (intent) => intent.kind !== "open_maps" || !gone(intent.value),
+    hiddenPins: (item.placePins ?? []).filter(
+      (pin) => !shownPins.includes(pin),
+    ),
+    hiddenLabels: (item.places ?? []).filter(
+      (name) => !(visible.places ?? []).includes(name),
+    ),
+    placeCuisines: item.placeCuisines?.filter((row) => !gone(row.name)),
+    intents: item.intents?.filter(
+      (intent) =>
+        intent.kind !== "open_maps" ||
+        !shownIntents.includes(intent) ||
+        !gone(intent.value),
     ),
   };
 }
@@ -178,19 +187,26 @@ export const savePlaces = authedMutation({
     if (args.places.length > MAX_ITEM_PLACES)
       throw new Error("Too many places");
     const requested = args.places.map(cleanPlace);
-    const removeOnly = onlyRemoves(requested, current)
-      ? removalEdit(visible, requested, current)
+    const kept = keptPositions(requested, current);
+    const removeOnly = kept
+      ? removalEdit(item, visible, requested, current, kept)
       : null;
     if (!removeOnly) await requireProEntitlement(ctx, ctx.userId);
     await rateLimiter.limit(ctx, "tripEdit", { key: ctx.userId, throws: true });
     const chosen = removeOnly?.kept ?? requested;
     if (samePlaces(chosen, current)) return null;
-    const cities = normalizeCities(
-      chosen.flatMap((place) =>
+    const cities = normalizeCities([
+      ...chosen.flatMap((place) =>
         place.city ? [place.city] : (item.cities ?? []),
       ),
-    );
-    const places = [...new Set(chosen.map((place) => place.name))];
+      ...(removeOnly?.hiddenPins ?? []).flatMap((pin) =>
+        pin.city ? [pin.city] : [],
+      ),
+    ]);
+    const hiddenLabels = removeOnly?.hiddenLabels ?? [];
+    const places = [
+      ...new Set([...chosen.map((place) => place.name), ...hiddenLabels]),
+    ];
     const unpinned = chosen.filter((place) => place.lat === undefined);
     const placePins =
       removeOnly?.placePins ??
@@ -206,7 +222,7 @@ export const savePlaces = authedMutation({
       placesEdited: true,
       placeLocations: normalizePlaceLocations(
         item.placeLocations,
-        unpinned.map(({ name }) => name),
+        [...unpinned.map(({ name }) => name), ...hiddenLabels],
         cities,
       ),
       placeCuisines: removeOnly ? removeOnly.placeCuisines : undefined,
@@ -218,9 +234,10 @@ export const savePlaces = authedMutation({
       ...patch,
       searchText: buildSearchText({ ...item, ...patch }),
     });
-    for (const removal of removalsSince(removals, item._creationTime))
-      if (placePins.some((pin) => isRemovedSuggestion([removal], pin)))
-        await ctx.db.delete(removal._id);
+    if (!removeOnly)
+      for (const removal of removalsSince(removals, item._creationTime))
+        if (placePins.some((pin) => isRemovedSuggestion([removal], pin)))
+          await ctx.db.delete(removal._id);
     if (unpinned.length > 0)
       await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
         itemId: item._id,
