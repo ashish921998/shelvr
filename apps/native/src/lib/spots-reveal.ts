@@ -78,6 +78,9 @@ export function followMovedPins(
     const moved = found.find(
       (other) =>
         other.name === pin.name &&
+        (!other.city ||
+          !pin.city ||
+          cityKey(other.city) === cityKey(pin.city)) &&
         !before.some((old) =>
           other.appleId ? old.appleId === other.appleId : at(old, other),
         ) &&
