@@ -29,6 +29,7 @@ export function useSpotsRemoval(
     latest.current = { listed, staged, revealed, count: found.length };
   });
   const written = useRef(0);
+  const queue = useRef(Promise.resolve(true));
   const left = useRef(false);
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export function useSpotsRemoval(
     return () => clearTimeout(timer);
   }, [undo]);
 
-  const write = async () => {
+  const persist = async () => {
     const from = written.current;
     const pending = latest.current.staged.slice(from);
     if (pending.length === 0) return true;
@@ -64,6 +65,7 @@ export function useSpotsRemoval(
     analytics.captureError("spots_removal_failed", failure);
     return false;
   };
+  const write = () => (queue.current = queue.current.then(persist));
 
   const leave = (via: SpotsExit) => {
     if (!left.current && latest.current.revealed) {

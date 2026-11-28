@@ -621,3 +621,29 @@ it("logs a back exit, not fix, when the Pro gate keeps the person on the reveal"
     mocks.capture.mock.calls.filter(([name]) => name === "share_spots_left"),
   ).toEqual([["share_spots_left", { pin_count: 2, removed: 0, via: "back" }]]);
 });
+
+it("makes a shared-list tick wait for a removal write already in flight", async () => {
+  const { AlsoAddTo } = await import("@/components/shared-list/also-add-to");
+  twoSpots();
+  let finish = () => {};
+  mocks.savePlaces.mockReturnValueOnce(
+    new Promise<null>((resolve) => (finish = () => resolve(null))),
+  );
+  mocks.admit.mockResolvedValue("paywalled");
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Odd Duck")));
+  fireEvent.click(screen.getByText("spots.fixPlaces"));
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledOnce();
+  const props = vi.mocked(AlsoAddTo).mock.lastCall?.[0];
+  let flushed: boolean | undefined;
+  const tick = props?.beforeToggle?.().then((ok) => (flushed = ok));
+  await flush();
+  expect(flushed).toBeUndefined();
+  await act(async () => {
+    finish();
+    await tick;
+  });
+  expect(flushed).toBe(true);
+  expect(mocks.savePlaces).toHaveBeenCalledOnce();
+});
