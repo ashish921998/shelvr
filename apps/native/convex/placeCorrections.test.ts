@@ -518,6 +518,26 @@ describe("removing places from one save", () => {
       "Tigre, Alfama",
     ]);
   });
+  it("keeps only the chosen one of two pins told apart by Apple id", async () => {
+    const { base, t, itemId } = await setup(false);
+    const first = { ...original, appleId: "apple-1" };
+    const second = { ...original, appleId: "apple-2" };
+    await base.run((ctx) =>
+      ctx.db.patch(itemId, {
+        places: [original.name],
+        placePins: [first, second],
+      }),
+    );
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: data.places.filter((place) => place.appleId === "apple-2"),
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.placePins).toEqual([second]);
+  });
   it("still needs Pro to add, replace or reorder", async () => {
     const { t, itemId, data } = await twoPlaces(false);
     for (const places of [

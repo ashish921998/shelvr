@@ -146,7 +146,8 @@ function removalEdit(
         (place) =>
           place.name === pin.name &&
           place.lat === pin.lat &&
-          place.lng === pin.lng,
+          place.lng === pin.lng &&
+          place.appleId === pin.appleId,
       ),
     ),
     placeCuisines: visible.placeCuisines?.filter((row) => !gone(row.name)),
