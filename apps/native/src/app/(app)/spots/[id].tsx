@@ -84,7 +84,12 @@ export default function SpotsScreen() {
   }, [reveal, waitedMs]);
 
   const [city, setCity] = useState<string | null>(null);
-  if (reveal.kind === "spots" && city === null) setCity(reveal.city);
+  if (
+    reveal.kind === "spots" &&
+    reveal.city !== city &&
+    (city === null || (save && pinsIn(save, city).length === 0))
+  )
+    setCity(reveal.city);
   const gone =
     reveal.kind === "none" && (city === null || reveal.reason !== "no_place");
   const found = city !== null && save ? pinsIn(save, city) : [];

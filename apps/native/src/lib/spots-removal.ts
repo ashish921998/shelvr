@@ -1,6 +1,7 @@
 import { analytics } from "@/lib/analytics";
 import { keptPlaces, type RevealPin, samePin } from "@/lib/spots-reveal";
 import { api } from "@convex/_generated/api";
+import { uniquePlacePins } from "@convex/model/trip";
 import type { Id } from "@convex/_generated/dataModel";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
@@ -10,6 +11,9 @@ const UNDO_MS = 6000;
 type SpotsExit = "done" | "city" | "fix" | "back";
 
 export type SpotsRemoval = ReturnType<typeof useSpotsRemoval>;
+
+const oneRow = (pin: RevealPin, other: RevealPin) =>
+  uniquePlacePins([pin, other]).length === 1;
 
 export function useSpotsRemoval(
   itemId: Id<"items">,
@@ -100,7 +104,8 @@ export function useSpotsRemoval(
       analytics.capture("share_spots_place_removed", {
         pin_count: found.length,
       });
-      setStaged((pins) => [...pins, pin]);
+      const row = found.filter((other) => oneRow(pin, other));
+      setStaged((pins) => [...pins, ...(row.length > 0 ? row : [pin])]);
       setUndo(pin);
     },
     restore: () => {
@@ -108,7 +113,9 @@ export function useSpotsRemoval(
       analytics.capture("share_spots_place_restored", {
         pin_count: found.length,
       });
-      setStaged((pins) => pins.filter((pin) => pin !== undo));
+      setStaged((pins) =>
+        pins.filter((pin) => pin !== undo && !oneRow(undo, pin)),
+      );
       setUndo(null);
     },
     fix: async () => {

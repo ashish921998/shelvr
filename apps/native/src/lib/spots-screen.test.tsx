@@ -698,3 +698,42 @@ it("shows a spot again when Edit places adds back one the reveal removed", async
   expect(screen.getByText("Odd Duck")).toBeTruthy();
   expect(screen.getByText('spots.count {"count":2}')).toBeTruthy();
 });
+
+it("removes every pin a merged reveal row stands for", async () => {
+  const twin = { ...uchi, lat: 30.2601 };
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [uchi, twin, duck],
+  };
+  mocks.listed = { places: [uchi, twin, duck], version: "v1", ready: true };
+  const { unmount } = render(<SpotsScreen />);
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  expect(screen.queryByText("Uchi")).toBeNull();
+  fireEvent.click(screen.getByText("common.undo"));
+  expect(screen.getByText("Uchi")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText(removeLabel("Uchi")));
+  unmount();
+  await flush();
+  expect(mocks.savePlaces).toHaveBeenCalledWith({
+    itemId: "item-1",
+    version: "v1",
+    places: [duck],
+  });
+});
+
+it("follows the save to another city after Edit places moves its places", () => {
+  twoSpots();
+  const { rerender } = render(<SpotsScreen />);
+  mocks.save = {
+    ...mocks.save!,
+    cities: ["Dallas"],
+    placePins: [
+      { name: "Pecan Lodge", lat: 32.78, lng: -96.8, city: "Dallas" },
+    ],
+  };
+  rerender(<SpotsScreen />);
+  expect(screen.getByText("Pecan Lodge")).toBeTruthy();
+  expect(screen.queryByText("spots.noneLeft")).toBeNull();
+});
